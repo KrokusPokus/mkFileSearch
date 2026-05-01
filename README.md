@@ -14,10 +14,8 @@ For example, to launch it for searching inside the path that the active Dolphin 
 
 if [ "$XDG_SESSION_TYPE" == "wayland" ]; then
     TOOL="kdotool"
-    OPTIONS=""
 else
     TOOL="xdotool"
-    OPTIONS="--onlyvisible"
 fi
 
 WINDOW_ID=$($TOOL getactivewindow)
