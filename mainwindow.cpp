@@ -134,7 +134,7 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     tableWidget->verticalHeader()->setMinimumSectionSize(0);
     tableWidget->verticalHeader()->setDefaultSectionSize(18);
     tableWidget->setColumnCount(8);
-    tableWidget->setHorizontalHeaderLabels({"Name", "Subfolder", "Größe", "Geändert am", "Typ", "Rating", "Count", "CRC"});
+    tableWidget->setHorizontalHeaderLabels({"Name", "Subfolder", "Size", "Changed", "Type", "Rating", "Count", "CRC"});
 
     tableWidget->setColumnWidth(eColName, 160);
     tableWidget->setColumnWidth(eColSubpath, 160);
@@ -788,9 +788,16 @@ void MainWindow::onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iCon
 
 void MainWindow::finalizeUI() {
     qDebug() << "finalizeUI() entry point. m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of search.  m_SearchStats_bSearchInterrupted =" << m_SearchStats_bSearchInterrupted << "  m_bAbortRequested = " << m_bAbortRequested;
-
-    //tableWidget->resizeColumnToContents(eColName);
-    //tableWidget->resizeColumnToContents(eColSubpath);         // doesn't work reliably anyway...
+/*
+    tableWidget->resizeColumnToContents(eColName);
+    tableWidget->resizeColumnToContents(eColSubpath);         // doesn't work reliably anyway...
+    tableWidget->resizeColumnToContents(eColSize);
+    tableWidget->resizeColumnToContents(eColDate);
+    tableWidget->resizeColumnToContents(eColType);
+    tableWidget->resizeColumnToContents(eColQuality);
+    tableWidget->resizeColumnToContents(eColCount);
+    tableWidget->resizeColumnToContents(eColCRC);
+*/
 
     if (m_SearchStats_iItemsFound == 0 || m_SearchStats_bSearchInterrupted == true || m_bAbortRequested) {
         m_currentSearchGeneration++; // Make old crc calc threads invalid to prevent seg faults from Use-After-Free
