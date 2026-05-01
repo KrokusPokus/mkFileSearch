@@ -20,19 +20,9 @@ else
     OPTIONS="--onlyvisible"
 fi
 
-
-# 1. Die ID des aktiven Fensters holen
 WINDOW_ID=$($TOOL getactivewindow)
-
-# 2. Den Namen (Titel) des Fensters auslesen
 FULL_TITLE=$($TOOL getwindowname "$WINDOW_ID")
-
-# 3. Den Titel bereinigen
-# Wir löschen alles ab dem " — Dolphin" Teil (Achtung: langer Gedankenstrich!)
-# Die Syntax ${VAR%muster} löscht das Muster am Ende des Strings
 CLEAN_PATH="${FULL_TITLE% — Dolphin}"
-
-# 4. Überprüfung und Ausführung
 if [ -d "$CLEAN_PATH" ]; then
     /path/to/mkFileSearch "$CLEAN_PATH"
 fi
