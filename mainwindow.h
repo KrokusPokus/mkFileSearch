@@ -12,6 +12,8 @@
 #include <QQueue>
 #include <QTimer>
 #include <QSet>
+#include <QPainter>             // Added for cut item opacity drawing
+#include <QStyledItemDelegate>  // Added for cut item opacity drawing
 
 #include "searchworker.h"
 #include "settingsmanager.h"
@@ -47,6 +49,27 @@ public:
         }
 
         return QTableWidgetItem::operator<(other);  // Fallback auf Standard-Textvergleich
+    }
+};
+
+
+class CutDelegate : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
+        // Wir nutzen eine benutzerdefinierte Daten-Rolle (z.B. Qt::UserRole + 5),
+        // um zu prüfen, ob dieses Item "ausgeschnitten" ist.
+        bool isCut = index.data(Qt::UserRole + 5).toBool();
+
+        if (isCut) {
+            painter->save();
+            painter->setOpacity(0.50);
+            QStyledItemDelegate::paint(painter, option, index);
+            painter->restore();
+        } else {
+            QStyledItemDelegate::paint(painter, option, index);
+        }
     }
 };
 
@@ -110,15 +133,18 @@ private:
     void addFileToTable(const QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
     void calculateVisibleCRCs();
     void finalizeUI();
-
     void onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void onWorkerSentBatch(const QList<SearchResult> &results);
+    void removeCutMarkers();
     void searchLoop(QString searchDir, QString searchStringFilename, QString searchStringContent, bool bRegExFilename, bool bRegExContent, bool bFilenameCaseSensitive, bool bContentCaseSensitive, Qt::CheckState cbDirState);
+    void setupClipboardForCut(QSet<int> rowSet);
     void showContextMenu(const QPoint &pos);
     void startSearch();
+    void onClipboardChanged();
     void validateInputBoxRegex();
     void onCheckboxRegExNameClicked(Qt::CheckState state);
     void onCheckboxRegExContentClicked(Qt::CheckState state);
+
 
     QPointer<QWidget> m_lastWidget;
 
@@ -135,6 +161,8 @@ private:
     QQueue<QList<SearchResult>> m_pendingBatches;
     bool m_isProcessingPending = false;
     bool m_workerHasFinished;
+    QByteArray m_currentClipboardToken;
+    QSet<int> m_rowsWithCutMarkers;
 
     SettingsManager m_settings;
 

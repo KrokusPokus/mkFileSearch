@@ -17,6 +17,7 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QObject>
+
 #include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -26,6 +27,7 @@
 #include <QSize>
 #include <QStandardPaths>
 #include <QStringList>
+
 #include <QThread>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -128,6 +130,7 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     // ListView
 
     tableWidget = new Custom_QTableWidget();
+    tableWidget->setItemDelegate(new CutDelegate(this));
     tableWidget->setEditTriggers(QAbstractItemView::EditKeyPressed);
     tableWidget->setStyleSheet("QTableWidget { border: none; }");
     tableWidget->verticalHeader()->setVisible(false);
@@ -320,6 +323,7 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     connect(CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxRegExNameClicked);
     connect(CheckboxRegExContent, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxRegExContentClicked);
     connect(tableWidget->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::onVerticalBarScrollChange);
+    connect(QApplication::clipboard(), &QClipboard::dataChanged, this, &MainWindow::onClipboardChanged);
 }
 
 MainWindow::~MainWindow() = default;
@@ -743,7 +747,7 @@ void MainWindow::addFileToTable(QFileInfo fileInfo, int iRow, int iLenRem, int n
 
     // Type or File Extension
     QTableWidgetItem *typeItem = new QTableWidgetItem(fileInfo.suffix());
-    typeItem->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
+    //typeItem->setTextAlignment(Qt::AlignCenter | Qt::AlignVCenter);
     typeItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
     tableWidget->setItem(iRow, eColType, typeItem);
 
@@ -1173,14 +1177,43 @@ void MainWindow::action_ListViewDeleteFiles(bool bRecycleOnly) {
 }
 
 void MainWindow::action_ListViewCutFiles() {
-    QStringList pathList = getTablePathList();
+    removeCutMarkers();
 
+    QList<QTableWidgetItem*> selectedItems = tableWidget->selectedItems();
+
+    // Zeilenindizes sammeln (verhindert Dopplungen bei Mehrfachauswahl in einer Zeile)
+    QSet<int> rowSet;
+    for (auto item : std::as_const(selectedItems)) {
+        rowSet.insert(item->row());
+    }
+
+    for (int row : std::as_const(rowSet)) {
+        for (int col = 0; col < tableWidget->columnCount(); ++col) {
+            QTableWidgetItem* item = tableWidget->item(row, col);
+            if (item) {
+                item->setData(Qt::UserRole + 5, true);
+            }
+        }
+    }
+
+    m_rowsWithCutMarkers = rowSet;
+
+    //tableWidget->viewport()->update();    // possibly not necessary
+    setupClipboardForCut(rowSet);   // Todo: Better first try to change clipboard, and only on success ghost out cut items
+}
+
+void MainWindow::setupClipboardForCut(QSet<int> rowSet) {
     auto *mimeData = new QMimeData();
     QList<QUrl> urls;
 
-    for (const QString &path : std::as_const(pathList)) {
-        urls << QUrl::fromLocalFile(path);
+    for (int row : rowSet) {
+        // Wir nehmen an, der Pfad liegt in Spalte 0 in der UserRole
+        QString path = tableWidget->item(row, eColName)->data(Qt::UserRole).toString();
+        if (!path.isEmpty()) {
+            urls << QUrl::fromLocalFile(path);
+        }
     }
+
     mimeData->setUrls(urls);
 
     // "Drop Effect" (Copy oder Move) for Windows
@@ -1198,10 +1231,43 @@ void MainWindow::action_ListViewCutFiles() {
     }
     mimeData->setData("x-special/gnome-copied-files", gnomeFormat);
 
+    m_currentClipboardToken = QByteArray::number(QDateTime::currentMSecsSinceEpoch());
+    mimeData->setData("application/x-mkfilesearch-token", m_currentClipboardToken);
+
     QGuiApplication::clipboard()->setMimeData(mimeData);
 }
 
+void MainWindow::onClipboardChanged() {
+    // We can not just always remove the markers, since we get notified of our own changes to the clipboard as well.
+    // We probably should set some flag with a random value when we cut items and check if this flag is still there.
+    const QMimeData* mimeData = QApplication::clipboard()->mimeData();
+
+    if (!mimeData->hasFormat("application/x-mkfilesearch-token") || mimeData->data("application/x-mkfilesearch-token") != m_currentClipboardToken) {
+        removeCutMarkers();
+        m_currentClipboardToken.clear();
+    }
+}
+
+void MainWindow::removeCutMarkers() {
+    if (!m_rowsWithCutMarkers.isEmpty()) {
+        tableWidget->setUpdatesEnabled(false);
+
+        for (int r : std::as_const(m_rowsWithCutMarkers)) {
+            for (int c = 0; c < tableWidget->columnCount(); ++c) {
+                if (QTableWidgetItem *item = tableWidget->item(r, c)) {
+                    item->setData(Qt::UserRole + 5, false);
+                }
+            }
+        }
+
+        m_rowsWithCutMarkers.clear();
+        tableWidget->setUpdatesEnabled(true);
+    }
+}
+
 void MainWindow::action_ListViewCopyFiles() {
+    removeCutMarkers();
+
     QStringList pathList = getTablePathList();
 
     auto *mimeData = new QMimeData();
@@ -1226,6 +1292,9 @@ void MainWindow::action_ListViewCopyFiles() {
         gnomeFormat.append(url.toEncoded());
     }
     mimeData->setData("x-special/gnome-copied-files", gnomeFormat);
+
+    m_currentClipboardToken = QByteArray::number(QDateTime::currentMSecsSinceEpoch());
+    mimeData->setData("application/x-mkfilesearch-token", m_currentClipboardToken);
 
     QGuiApplication::clipboard()->setMimeData(mimeData);
 }
@@ -1298,12 +1367,19 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 //QCoreApplication::removePostedEvents(this, QEvent::MetaCall);
                 qDebug() << "eventFilter: Qt::Key_Escape pressed, abort requested!  m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of last search.";
                 return true; // Escape "verschlucken", damit nichts anderes passiert
-            } else {
-                 //qDebug() << "eventFilter: Qt::Key_Escape pressed, but no search active! m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of last search.";
+            }
+
+            if (tableWidget->hasFocus()) {
+                // Empty Clipboard, but only if it's our own
+                const QMimeData* mimeData = QApplication::clipboard()->mimeData();
+                if (mimeData->hasFormat("application/x-mkfilesearch-token") && mimeData->data("application/x-mkfilesearch-token") == m_currentClipboardToken) {
+                    QApplication::clipboard()->clear();
+                    // removeCutMarkers();  // Will be called automatically since we changed the clipboard
+                    return true; // Escape "verschlucken"
+                }
             }
         }
     }
     // WICHTIG: Alles andere an die Basisklasse weiterreichen!
     return QObject::eventFilter(obj, event);
 }
-

@@ -19,11 +19,11 @@ void SettingsManager::load() {
 	videoExts = parseExtensions(s.value("Extensions/FileExtVideo", DEFAULT_VIDEO).toString());
 
 	// Handlers
-	audioEditor      = QDir::toNativeSeparators(s.value("Handlers/AudioEditor").toString());
-	imageEditor      = QDir::toNativeSeparators(s.value("Handlers/ImageEditor").toString());
-	textEditor       = QDir::toNativeSeparators(s.value("Handlers/TextEditor").toString());
-	videoEditor      = QDir::toNativeSeparators(s.value("Handlers/VideoEditor").toString());
-	fileManager      = QDir::toNativeSeparators(s.value("Handlers/FileManager").toString());
+    audioEditor      = QDir::toNativeSeparators(s.value("Handlers/AudioEditor", "kwave").toString());
+    imageEditor      = QDir::toNativeSeparators(s.value("Handlers/ImageEditor", "gimp").toString());
+    textEditor       = QDir::toNativeSeparators(s.value("Handlers/TextEditor", "kate").toString());
+    videoEditor      = QDir::toNativeSeparators(s.value("Handlers/VideoEditor", "kdenlive").toString());
+    fileManager      = QDir::toNativeSeparators(s.value("Handlers/FileManager", "dolphin").toString());
 	propertiesDialog = QDir::toNativeSeparators(s.value("Handlers/PropertiesDialog").toString());
 
 	// Interface
@@ -52,12 +52,12 @@ void SettingsManager::save() {
 	s.setValue("Extensions/FileExtText", DEFAULT_TEXT);
 	s.setValue("Extensions/FileExtVideo", DEFAULT_VIDEO);
 
-	s.setValue("Handlers/AudioEditor", "");
-	s.setValue("Handlers/ImageEditor", "");
-	s.setValue("Handlers/TextEditor", "");
-	s.setValue("Handlers/VideoEditor", "");
-	s.setValue("Handlers/FileManager", "");
-	s.setValue("Handlers/PropertiesDialog", "");
+    s.setValue("Handlers/AudioEditor", audioEditor);
+    s.setValue("Handlers/ImageEditor", imageEditor);
+    s.setValue("Handlers/TextEditor", textEditor);
+    s.setValue("Handlers/VideoEditor", videoEditor);
+    s.setValue("Handlers/FileManager", fileManager);
+    s.setValue("Handlers/PropertiesDialog", propertiesDialog);
 
 	s.setValue("Interface/AlternatingRowColors", alternatingRowColors);
 	s.setValue("Interface/FontNameOverride", fontNameOverride);
