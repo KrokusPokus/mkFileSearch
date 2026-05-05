@@ -14,10 +14,8 @@ public:
 	SettingsManager();
 
 	void load();
-	void save(); // Falls du später Werte zur Laufzeit ändern willst
-
-	// --- Die Daten (öffentlich für einfachen Zugriff) ---
-	QString getSettingsPath();
+    void save();
+    QString getSettingsPath();
 
 	bool useSearchWorker;
 
@@ -34,16 +32,20 @@ public:
 	QString propertiesDialog;
 
 	bool alternatingRowColors;
-	QString fontNameOverride;
-	int fontSizeOverride;
 	bool showGrid;
+    bool showIconsInMenu;
 	bool showPlaceholderText;
+    bool showShortcutsInMenu;
+    int fontSizeOverride;
+    QString fontNameOverride;
 
 private:
 
 	QSet<QString> parseExtensions(const QString &input);
+    void safeSetValue(QSettings &settings, const QString &key, const QVariant &value);
+    QString formatStringSet(const QSet<QString> &extensionSet);
 
-	// Default-Konstanten
+    // Defaults
 	const QString DEFAULT_AUDIO = "aac,flac,m4a,mid,mp3,ogg,wav";
 	const QString DEFAULT_IMAGE = "avif,bmp,gif,heic,heif,jpg,jpeg,jxl,png,qoi,tga,tif,tiff,webp,xcf";
     const QString DEFAULT_TEXT  = "ahk,ass,au3,bat,c,cfg,conf,cpp,cs,css,cue,cxx,desktop,dic,dsf,dsk,duf,h,hpp,htm,html,inf,ini,ion,js,json,log,lst,lua,md,nfo,py,rc,reg,scp,sfv,sh,slang,slangp,sql,srt,ssa,txt,url,vbs,vcxproj,xhtml,xml,xul,yml";

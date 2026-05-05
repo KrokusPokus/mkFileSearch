@@ -22,7 +22,7 @@ QString cleanFileName(const QString &fileName) {
     pattern = "[/\\x00]";
 #endif
 
-    QRegularExpression re(pattern);
+    static const QRegularExpression re(pattern);
 
     QString cleanedName = fileName; // local copy
     cleanedName.replace(re, "_");
@@ -38,8 +38,10 @@ QString cleanFileName(const QString &fileName) {
 }
 
 QString formatAdaptiveSize(qint64 bytes) {
+    static const QLocale locale = QLocale::system();
+
     if (bytes < 1024) {
-        return QLocale::system().toString(bytes) + " Bytes";
+        return locale.toString(bytes) + " Bytes";
     }
 
     double size = static_cast<double>(bytes);
@@ -60,7 +62,7 @@ QString formatAdaptiveSize(qint64 bytes) {
         precision = 0; // z.B. 123 MiB
     }
 
-    return QLocale::system().toString(size, 'f', precision) + " " + units[unitIndex];
+    return locale.toString(size, 'f', precision) + " " + units[unitIndex];
 }
 
 quint32 calculateCRC32(const QString &filePath) {
@@ -74,20 +76,31 @@ quint32 calculateCRC32(const QString &filePath) {
 
     // Read in chunks to be memory efficient
     const int bufferSize = 1024 * 1024; // 1 MB buffer
-    QByteArray buffer;
+    QByteArray buffer(bufferSize, Qt::Uninitialized);
 
     while (!file.atEnd()) {
-        buffer = file.read(bufferSize);
+        qint64 bytesRead = file.read(buffer.data(), bufferSize);
         // Update the CRC with the current chunk
-        crc = crc32(crc, reinterpret_cast<const Bytef*>(buffer.data()), buffer.size());
+        crc = crc32(crc, reinterpret_cast<const Bytef*>(buffer.data()), bytesRead);
     }
 
     file.close();
     return static_cast<quint32>(crc);
 }
 
-uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchString, Qt::CaseSensitivity caseSensitivity) {
-    QString sFilePath = fileInfo.filePath();
+bool atWordBoundary(const QString &fileName, const QString &word, Qt::CaseSensitivity caseSensitivity) {
+    static const QString separators = " .(-_[";
+    int pos = 0;
+    while ((pos = fileName.indexOf(word, pos, caseSensitivity)) != -1) {
+        if (pos > 0 && separators.contains(fileName[pos - 1])) {
+            return true;
+        }
+        pos += word.length();
+    }
+    return false;
+};
+
+uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchString, const QStringList &searchStringSplit, Qt::CaseSensitivity caseSensitivity) {
     QString sFileName = fileInfo.fileName();
     QString sBaseNameComplete = fileInfo.completeBaseName();    // for "/home/user/archive.tar.gz" this would return "archive.tar"
     QString sBaseName =  fileInfo.baseName();                   // for "/home/user/archive.tar.gz" this would return "archive"
@@ -100,8 +113,11 @@ uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchString,
         return 2;
     }
 
-    if ((searchString.contains("/", Qt::CaseSensitive) || searchString.contains("\\", Qt::CaseSensitive)) && sFilePath.contains(searchString, caseSensitivity))  {
-        return 3;
+    if (searchString.contains("/", Qt::CaseSensitive) || searchString.contains("\\", Qt::CaseSensitive))  {
+        QString sFilePath = fileInfo.filePath();
+        if (sFilePath.contains(searchString, caseSensitivity)) {
+            return 3;
+            }
     }
 
     // Match search terms separatately
@@ -111,9 +127,7 @@ uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchString,
     int iIndex = 0;
     int iFoundPos = 0;
 
-    QStringList parts = searchString.split(' ', Qt::SkipEmptyParts);
-
-    for (const QString &word : std::as_const(parts)) {
+    for (const QString &word : std::as_const(searchStringSplit)) {
         iFoundPos = sFileName.indexOf(word, 0, caseSensitivity);
 
         if (iFoundPos == -1) { // not found
@@ -126,10 +140,9 @@ uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchString,
             if (iIndex == 0) {  // Further improved match, since *first* searchterm found at very beginning of filename
                 bMatchType3 = true;
             }
-        } else {
-            if (sFileName.contains(' ' + word, caseSensitivity) || sFileName.contains('[' + word, caseSensitivity)) { // Improved match, since one searchterm found at a word boundary of filename (after " " or "[")
-                bMatchType2 = true;
-            }
+        } else if (atWordBoundary(sFileName, word, caseSensitivity)) {
+            // Improved match: one searchterm found at a word boundary in filename
+            bMatchType2 = true;
         }
 
         iIndex++;
@@ -163,16 +176,22 @@ uint getContentMatchCount(const QFileInfo &fileInfo, const QString &searchString
         return 0;
     }
 
+    if (fileInfo.size() > 64 * 1024 * 1024) {
+        return 0;
+    }
+
     QFile file(fileInfo.filePath());
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return 0;
     }
 
-    if (file.size() > 64 * 1024 * 1024) {
-        return 0;
-    }
-
     QTextStream in(&file);
+
+    // Option A: explizit UTF-8 erzwingen (aktuelles Verhalten dokumentieren)
+    //in.setEncoding(QStringConverter::Utf8);
+    // Option B: Locale-basiert dekodieren (breiter, aber langsamer)
+    //in.setEncoding(QStringConverter::System);
+
     QString fileContent = in.readAll();
 
     int searchStringLength = searchStringContent.length();
@@ -210,7 +229,7 @@ uint getRegExContentMatchCount(const QFileInfo &fileInfo, const QRegularExpressi
     int iCount = 0;
 
     while (it.hasNext()) {
-        QRegularExpressionMatch match = it.next();
+        it.next();
         iCount++;
     }
 

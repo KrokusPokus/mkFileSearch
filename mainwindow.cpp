@@ -27,6 +27,7 @@
 #include <QSize>
 #include <QStandardPaths>
 #include <QStringList>
+#include <QStringView>
 
 #include <QThread>
 #include <QUrl>
@@ -179,6 +180,94 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     connect(WindowShortcutN, &QShortcut::activated, this, &MainWindow::action_EditSettingsFile);
 
     // --------------------------------------------------------------------
+    // Context menu Actions (tableWidget)
+
+    m_actionListViewOpenFiles = new QAction(tr("Open"), this);
+    //m_actionListViewOpenFiles->setShortcut(QKeySequence("Ctrl+O"));
+    //m_actionListViewOpenFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewOpenFiles);
+    connect(m_actionListViewOpenFiles, &QAction::triggered, this, &MainWindow::action_ListViewOpenFiles);
+
+    m_actionListViewEditFiles = new QAction(tr("Edit"), this);
+    m_actionListViewEditFiles->setShortcut(QKeySequence("Ctrl+E"));
+    m_actionListViewEditFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewEditFiles);
+    connect(m_actionListViewEditFiles, &QAction::triggered, this, &MainWindow::action_ListViewEditFiles);
+
+    m_actionListViewBrowseToFile = new QAction(tr("Show in folder"),this);
+    m_actionListViewBrowseToFile->setIcon(QIcon::fromTheme("folder-open"));
+    m_actionListViewBrowseToFile->setShortcut(QKeySequence("Ctrl+L"));
+    m_actionListViewBrowseToFile->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewBrowseToFile);
+    connect(m_actionListViewBrowseToFile, &QAction::triggered, this, &MainWindow::action_ListViewBrowseToFile);
+
+    m_actionListViewCopyPaths = new QAction(tr("Copy Path"), this);
+    m_actionListViewCopyPaths->setIcon(QIcon::fromTheme("edit-copy-path"));
+    m_actionListViewCopyPaths->setShortcut(QKeySequence("Ctrl+Shift+C"));
+    m_actionListViewCopyPaths->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewCopyPaths);
+    connect(m_actionListViewCopyPaths, &QAction::triggered, this, &MainWindow::action_ListViewCopyPaths);
+
+    m_actionListViewCutFiles = new QAction(tr("Cut"), this);
+    m_actionListViewCutFiles->setIcon(QIcon::fromTheme("edit-cut"));
+    m_actionListViewCutFiles->setShortcut(QKeySequence("Ctrl+X"));
+    m_actionListViewCutFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewCutFiles);
+    connect(m_actionListViewCutFiles, &QAction::triggered, this, &MainWindow::action_ListViewCutFiles);
+
+    m_actionListViewCopyFiles = new QAction(tr("Copy"), this);
+    m_actionListViewCopyFiles->setIcon(QIcon::fromTheme("edit-copy"));
+    m_actionListViewCopyFiles->setShortcut(QKeySequence("Ctrl+C"));
+    m_actionListViewCopyFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewCopyFiles);
+    connect(m_actionListViewCopyFiles, &QAction::triggered, this, &MainWindow::action_ListViewCopyFiles);
+
+    m_actionListViewDeleteFiles = new QAction(tr("Delete"), this);
+    m_actionListViewDeleteFiles->setIcon(QIcon::fromTheme("edit-delete"));
+    m_actionListViewDeleteFiles->setShortcut(QKeySequence::Delete);
+    m_actionListViewDeleteFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewDeleteFiles);
+    connect(m_actionListViewDeleteFiles, &QAction::triggered, this, [this]() { action_ListViewDeleteFiles(true); });
+
+    m_actionListViewRenameFiles = new QAction(tr("Rename"), this);
+    m_actionListViewRenameFiles->setIcon(QIcon::fromTheme("edit-rename"));
+    m_actionListViewRenameFiles->setShortcut(QKeySequence(Qt::Key_F2));
+    m_actionListViewRenameFiles->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewRenameFiles);
+    connect(m_actionListViewRenameFiles, &QAction::triggered, this, &MainWindow::action_ListViewRenameFiles);
+
+    m_actionListViewFileProperties = new QAction(tr("Properties"), this);
+    m_actionListViewFileProperties->setIcon(QIcon::fromTheme("document-properties"));
+    //m_actionListViewFileProperties->setShortcut(QKeySequence("Ctrl+I"));
+    //m_actionListViewFileProperties->setShortcutContext(Qt::WidgetShortcut);
+    tableWidget->addAction(m_actionListViewFileProperties);
+    connect(m_actionListViewFileProperties, &QAction::triggered, this, &MainWindow::action_ListViewFileProperties);
+
+    if (m_settings.showIconsInMenu == false) {
+        m_actionListViewOpenFiles->setIconVisibleInMenu(false);
+        m_actionListViewEditFiles->setIconVisibleInMenu(false);
+        m_actionListViewBrowseToFile->setIconVisibleInMenu(false);
+        m_actionListViewCopyPaths->setIconVisibleInMenu(false);
+        m_actionListViewCutFiles->setIconVisibleInMenu(false);
+        m_actionListViewCopyFiles->setIconVisibleInMenu(false);
+        m_actionListViewDeleteFiles->setIconVisibleInMenu(false);
+        m_actionListViewRenameFiles->setIconVisibleInMenu(false);
+        m_actionListViewFileProperties->setIconVisibleInMenu(false);
+    }
+
+    if (m_settings.showShortcutsInMenu == false) {
+        m_actionListViewOpenFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewEditFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewBrowseToFile->setShortcutVisibleInContextMenu(false);
+        m_actionListViewCopyPaths->setShortcutVisibleInContextMenu(false);
+        m_actionListViewCutFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewCopyFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewDeleteFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewRenameFiles->setShortcutVisibleInContextMenu(false);
+        m_actionListViewFileProperties->setShortcutVisibleInContextMenu(false);
+    }
+
+    // --------------------------------------------------------------------
     // Shorcuts: tableWidget
 
     QShortcut *ListViewShortcutHome = new QShortcut(QKeySequence(Qt::Key_Home), tableWidget);
@@ -186,30 +275,6 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
 
     QShortcut *ListViewShortcutEnd = new QShortcut(QKeySequence(Qt::Key_End), tableWidget);
     connect(ListViewShortcutEnd, &QShortcut::activated, this, [this]() { int lastRow = tableWidget->rowCount() - 1; if (lastRow >= 0) { tableWidget->setCurrentCell(lastRow, 0);tableWidget->scrollToBottom(); }});
-
-    QShortcut *ListViewShortcutL = new QShortcut(QKeySequence("Ctrl+L"), tableWidget);
-    ListViewShortcutL->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutL, &QShortcut::activated, this, &MainWindow::action_ListViewBrowseToFile);
-
-    QShortcut *ListViewShortcutC = new QShortcut(QKeySequence("Ctrl+C"), tableWidget);
-    ListViewShortcutC->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutC, &QShortcut::activated, this, &MainWindow::action_ListViewCopyFiles);
-
-    QShortcut *ListViewShortcutShiftC = new QShortcut(QKeySequence("Ctrl+Shift+C"), tableWidget);
-    ListViewShortcutShiftC->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutShiftC, &QShortcut::activated, this, &MainWindow::action_ListViewCopyPaths);
-
-    QShortcut *ListViewShortcutE = new QShortcut(QKeySequence("Ctrl+E"), tableWidget);
-    ListViewShortcutE->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutE, &QShortcut::activated, this, &MainWindow::action_ListViewEditFiles);
-
-    QShortcut *ListViewShortcutX = new QShortcut(QKeySequence("Ctrl+X"), tableWidget);
-    ListViewShortcutX->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutX, &QShortcut::activated, this, &MainWindow::action_ListViewCutFiles);
-
-    QShortcut *ListViewShortcutDel = new QShortcut(QKeySequence::Delete, tableWidget);
-    ListViewShortcutDel->setContext(Qt::WidgetShortcut);
-    connect(ListViewShortcutDel, &QShortcut::activated, this, [this]() { action_ListViewDeleteFiles(true); });
 
     QShortcut *ListViewShortcutShiftDel = new QShortcut(QKeySequence("Shift+Delete"), tableWidget);
     ListViewShortcutShiftDel->setContext(Qt::WidgetShortcut);
@@ -585,6 +650,8 @@ void MainWindow::searchLoop(QString searchDir, QString searchStringFilename, QSt
         return;
     }
 
+    QStringList searchStringFilenameSplit = searchStringFilename.split(' ', Qt::SkipEmptyParts);
+
     int nameMatchQuality = -1;
     int contentMatchCount = -1;
     uint iRow = 0;
@@ -598,7 +665,7 @@ void MainWindow::searchLoop(QString searchDir, QString searchStringFilename, QSt
             if (bRegExFilename) {
                 nameMatchQuality = getRegExNameMatchQuality(iter.fileInfo(), qreFileName);
             } else {
-                nameMatchQuality = getNameMatchQuality(iter.fileInfo(), searchStringFilename, caseSensitivityFilename);
+                nameMatchQuality = getNameMatchQuality(iter.fileInfo(), searchStringFilename, searchStringFilenameSplit, caseSensitivityFilename);
             }
 
             if (nameMatchQuality == 0) {
@@ -695,30 +762,46 @@ void MainWindow::onWorkerSentBatch(const QList<SearchResult> &batch) {
 }
 
 void MainWindow::addFileToTable(QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount) {
+    //-----------------------------------
     // Icon Cache
-    QString suffix;
+
+    QHash<QString, QIcon>::iterator it;
 
     if (fileInfo.isDir()) {
         // The '/' is a forbidden character for file names both on linux and windows,
         // so we can use it as an otherwise impossible suffix marker
-        suffix = "//dir//";
 
+        it = m_iconCache.find("//dir//");
+        if (it == m_iconCache.end()) {
+            it = m_iconCache.insert("//dir//", m_iconProvider.icon(QFileIconProvider::Folder));
+        }
+
+        /*
         if (!m_iconCache.contains("//dir//")) {
             m_iconCache.insert("//dir//", m_iconProvider.icon(QFileIconProvider::Folder));
         }
+        */
     } else {
-        suffix = fileInfo.suffix().toLower();
+        QString suffix = fileInfo.suffix().toLower();
 
+        it = m_iconCache.find(suffix);
+        if (it == m_iconCache.end()) {
+            QFileInfo dummyInfo("any_filename." + suffix);
+            it = m_iconCache.insert(suffix, m_iconProvider.icon(dummyInfo));
+        }
+
+        /*
         if (!m_iconCache.contains(suffix)) {
             //m_iconCache.insert(suffix, m_iconProvider.icon(fileInfo)); // This would give us the unique file's actual icon, including overlays etc.
             QFileInfo dummyInfo("any_filename." + suffix);
             m_iconCache.insert(suffix, m_iconProvider.icon(dummyInfo));
         }
+        */
     }
 
     // Icon & Name
     QTableWidgetItem *nameItem = new QTableWidgetItem(fileInfo.fileName());
-    nameItem->setIcon(m_iconCache[suffix]);
+    nameItem->setIcon(it.value());
     nameItem->setData(Qt::UserRole, fileInfo.absoluteFilePath());
     nameItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
     tableWidget->setItem(iRow, eColName, nameItem);
@@ -792,16 +875,6 @@ void MainWindow::onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iCon
 
 void MainWindow::finalizeUI() {
     qDebug() << "finalizeUI() entry point. m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of search.  m_SearchStats_bSearchInterrupted =" << m_SearchStats_bSearchInterrupted << "  m_bAbortRequested = " << m_bAbortRequested;
-/*
-    tableWidget->resizeColumnToContents(eColName);
-    tableWidget->resizeColumnToContents(eColSubpath);         // doesn't work reliably anyway...
-    tableWidget->resizeColumnToContents(eColSize);
-    tableWidget->resizeColumnToContents(eColDate);
-    tableWidget->resizeColumnToContents(eColType);
-    tableWidget->resizeColumnToContents(eColQuality);
-    tableWidget->resizeColumnToContents(eColCount);
-    tableWidget->resizeColumnToContents(eColCRC);
-*/
 
     if (m_SearchStats_iItemsFound == 0 || m_SearchStats_bSearchInterrupted == true || m_bAbortRequested) {
         m_currentSearchGeneration++; // Make old crc calc threads invalid to prevent seg faults from Use-After-Free
@@ -823,6 +896,15 @@ void MainWindow::finalizeUI() {
 
     tableWidget->setSortingEnabled(true);
     tableWidget->setUpdatesEnabled(true);
+
+    tableWidget->resizeColumnToContents(eColName);
+    //tableWidget->resizeColumnToContents(eColSubpath);
+    tableWidget->resizeColumnToContents(eColSize);
+    tableWidget->resizeColumnToContents(eColDate);
+    tableWidget->resizeColumnToContents(eColType);
+    tableWidget->resizeColumnToContents(eColQuality);
+    tableWidget->resizeColumnToContents(eColCount);
+    tableWidget->resizeColumnToContents(eColCRC);
 
     QString titleString;
     QString InputBox2Text = InputBox2->text();
@@ -904,47 +986,27 @@ void MainWindow::showContextMenu(const QPoint &pos) {
     QString filePath = tableWidget->item(row, eColName)->data(Qt::UserRole).toString();
     QFileInfo fileInfo(filePath);
     QString fileExt = fileInfo.suffix().toLower();
-    QAction *editAction;
 
     QMenu menu(this);
 
-        QAction *openAction = menu.addAction("Öffnen");
-        menu.setDefaultAction(openAction);
-        if (m_settings.audioExts.contains(fileExt) || m_settings.imageExts.contains(fileExt) || m_settings.textExts.contains(fileExt) || m_settings.videoExts.contains(fileExt)) {
-            editAction = menu.addAction("Bearbeiten");
-        }
-    menu.addSeparator();
-        QAction *folderAction = menu.addAction("Ordner öffnen");
-        QAction *copyPathAction = menu.addAction("Pfad kopieren");
-        QAction *cutAction = menu.addAction("Ausschneiden");
-        QAction *copyAction = menu.addAction("Kopieren");
-        QAction *deleteAction = menu.addAction("Löschen");
-        QAction *renameAction = menu.addAction("Umbenennen");
-    menu.addSeparator();
-        QAction *propertiesAction = menu.addAction("Eigenschaften");
+    menu.addAction(m_actionListViewOpenFiles);
+    menu.setDefaultAction(m_actionListViewOpenFiles);
 
-    QAction *selectedAction = menu.exec(tableWidget->viewport()->mapToGlobal(pos));
-    if (!selectedAction) return;
+    if (m_settings.audioExts.contains(fileExt) || m_settings.imageExts.contains(fileExt) || m_settings.textExts.contains(fileExt) || m_settings.videoExts.contains(fileExt)) {
+        menu.addAction(m_actionListViewEditFiles);
+    }
 
-    if (selectedAction == openAction) {
-        action_ListViewOpenFiles();
-    } else if (selectedAction == editAction) {
-        action_ListViewEditFiles();
-    } else if (selectedAction == folderAction) {
-        action_ListViewBrowseToFile();
-    } else if (selectedAction == copyPathAction) {
-        action_ListViewCopyPaths();
-    } else if (selectedAction == cutAction) {
-        action_ListViewCutFiles();
-    } else if (selectedAction == copyAction) {
-        action_ListViewCopyFiles();
-    } else if (selectedAction == deleteAction) {
-        action_ListViewDeleteFiles(true);
-    } else if (selectedAction == renameAction) {
-        tableWidget->editItem(tableWidget->item(row, eColName));
-    } else if (selectedAction == propertiesAction) {
-        action_ListViewFileProperties();
-}
+    menu.addSeparator(); //-----------------------------------------
+    menu.addAction(m_actionListViewBrowseToFile);
+    menu.addAction(m_actionListViewCopyPaths);
+    menu.addAction(m_actionListViewCutFiles);
+    menu.addAction(m_actionListViewCopyFiles);
+    menu.addAction(m_actionListViewDeleteFiles);
+    menu.addAction(m_actionListViewRenameFiles);
+    menu.addSeparator(); //-----------------------------------------
+    menu.addAction(m_actionListViewFileProperties);
+
+    menu.exec(tableWidget->viewport()->mapToGlobal(pos));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -986,36 +1048,79 @@ void MainWindow::action_ListViewOpenFiles() {
 }
 
 void MainWindow::action_ListViewEditFiles() {
-    //QStringList pathList = getTablePathList();
 
-    QTableWidgetItem *item = tableWidget->currentItem();
-    if (!item) return;
-
-    QString path = tableWidget->item(item->row(), eColName)->data(Qt::UserRole).toString();
-    QString nativePath = QDir::toNativeSeparators(path);
-    QFileInfo fileInfo(path);
-    QString fileExt = fileInfo.suffix().toLower();
-
-    QString handlerApp;
-
-    if (m_settings.audioExts.contains(fileExt)) {
-        handlerApp = m_settings.audioEditor;
-        qDebug() << "fileExt " << fileExt << " is type Audio. Handler: " << m_settings.audioEditor;
-    } else if (m_settings.imageExts.contains(fileExt)) {
-        handlerApp = m_settings.imageEditor;
-        qDebug() << "fileExt " << fileExt << " is type Image. Handler: " << m_settings.imageEditor;
-    } else if (m_settings.textExts.contains(fileExt)) {
-        handlerApp = m_settings.textEditor;
-        qDebug() << "fileExt " << fileExt << " is type Text. Handler: " << m_settings.textEditor;
-    } else if (m_settings.videoExts.contains(fileExt)) {
-        handlerApp = m_settings.videoEditor;
-        qDebug() << "fileExt " << fileExt << " is type Video. Handler: " << m_settings.videoEditor;
+    QList<QTableWidgetItem*> selectedItems = tableWidget->selectedItems();
+    if (selectedItems.isEmpty()) {
+        return;
     }
 
-    if (QFile::exists(handlerApp)) {
-        QProcess::startDetached(handlerApp, {nativePath});
+    // Zeilenindizes sammeln (verhindert Dopplungen bei Mehrfachauswahl in einer Zeile)
+    // (Die Funktion selectedItems() gibt stumpf jedes einzelne Item (jede Zelle) zurück, das gerade farblich hinterlegt ist.)
+    QSet<int> rowSet;
+    for (auto *item : std::as_const(selectedItems)) {
+        rowSet.insert(item->row());
     }
-    qDebug() << "Launched: " << handlerApp << " " << nativePath;
+
+    QStringList pathListAudio;
+    QStringList pathListImage;
+    QStringList pathListText;
+    QStringList pathListVideo;
+
+    for (int row : rowSet) {
+        // Der Pfad liegt in Spalte 0 in der UserRole
+        QString fullPath = tableWidget->item(row, eColName)->data(Qt::UserRole).toString();
+        if (fullPath.isEmpty()) {
+            continue;
+        }
+
+        QFileInfo fileInfo(fullPath);
+        QString fileExt = fileInfo.suffix().toLower();
+        if (fileExt.isEmpty()) {
+            continue;
+        }
+
+        if (m_settings.audioExts.contains(fileExt)) {
+            pathListAudio << fullPath;
+        } else if (m_settings.imageExts.contains(fileExt)) {
+            pathListImage << fullPath;
+        } else if (m_settings.textExts.contains(fileExt)) {
+            pathListText << fullPath;
+        } else if (m_settings.videoExts.contains(fileExt)) {
+            pathListVideo << fullPath;
+        }
+    }
+
+    if (!pathListAudio.isEmpty()) {
+        openFileListWithHandler(m_settings.audioEditor, pathListAudio);
+    }
+
+    if (!pathListImage.isEmpty()) {
+        openFileListWithHandler(m_settings.imageEditor, pathListImage);
+    }
+
+    if (!pathListText.isEmpty()) {
+        openFileListWithHandler(m_settings.textEditor, pathListText);
+    }
+
+    if (!pathListVideo.isEmpty()) {
+        openFileListWithHandler(m_settings.videoEditor, pathListVideo);
+    }
+}
+
+void MainWindow::openFileListWithHandler(const QString &handlerApp, const QStringList &fileList) {
+    QString appPath = handlerApp;
+
+    if (!QFile::exists(appPath)) {
+        appPath = QStandardPaths::findExecutable(handlerApp);
+        if (appPath.isEmpty()) {
+            qDebug() << "Fehler: " << handlerApp << " ist nicht installiert.";
+            return;
+        }
+    }
+
+    QString nativePath = QDir::toNativeSeparators(appPath);
+    // bool QProcess::startDetached(const QString &program, const QStringList &arguments = {}, const QString &workingDirectory = QString(), qint64 *pid = nullptr)
+    QProcess::startDetached(nativePath, fileList);
 }
 
 void MainWindow::action_ListViewCopyPaths() {
@@ -1158,7 +1263,10 @@ void MainWindow::action_ListViewDeleteFiles(bool bRecycleOnly) {
     std::sort(sortedRows.begin(), sortedRows.end(), std::greater<int>());
 
     for (int row : std::as_const(sortedRows)) {
-        QString path = tableWidget->item(row, eColName)->data(Qt::UserRole).toString();
+        QTableWidgetItem *nameItem = tableWidget->item(row, eColName);
+        if (!nameItem) continue;
+
+        QString path = nameItem->data(Qt::UserRole).toString();
 
         if (bRecycleOnly) {
             if (QFile::moveToTrash(path)) {
@@ -1314,7 +1422,7 @@ void MainWindow::action_ListViewBrowseToFile() {
         QProcess::startDetached(QDir::toNativeSeparators(m_settings.fileManager), args);
     } else {
         QStringList args;
-        args << "/select," << QDir::toNativeSeparators(path);
+        args << "/select," + QDir::toNativeSeparators(path);
         QProcess::startDetached("explorer.exe", args);
     }
 #elif defined(Q_OS_LINUX)
@@ -1329,6 +1437,14 @@ void MainWindow::action_ListViewBrowseToFile() {
 #endif
 }
 
+void MainWindow::action_ListViewRenameFiles() {
+    QTableWidgetItem *item = tableWidget->currentItem();
+    if (!item) return;
+
+    int row = item->row();
+    tableWidget->editItem(tableWidget->item(row, eColName));
+}
+
 void MainWindow::action_ListViewFileProperties() {
     QStringList pathList = getTablePathList();
 
@@ -1336,13 +1452,8 @@ void MainWindow::action_ListViewFileProperties() {
         return;
     }
 
-    QString nativePath = QDir::toNativeSeparators(pathList[0]);
-    if (pathList.size() == 1) {
-        if (!m_settings.propertiesDialog.isEmpty() && QFile::exists(nativePath)) {
-            QProcess::startDetached(m_settings.propertiesDialog, {nativePath});
-        }
-    } else {
-
+    if (!m_settings.propertiesDialog.isEmpty()) {
+        QProcess::startDetached(m_settings.propertiesDialog, pathList);
     }
 }
 

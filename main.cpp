@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 
     int targetFontSize = currentFont.pointSize();
 
-    if ((m_settings.fontSizeOverride != 0) && (targetFontSize != m_settings.fontSizeOverride)) {
+    if ((m_settings.fontSizeOverride > 0) && (m_settings.fontSizeOverride < 100) && (targetFontSize != m_settings.fontSizeOverride)) {
         targetFontSize = m_settings.fontSizeOverride;
     }
 
@@ -66,12 +66,12 @@ int main(int argc, char *argv[])
         QFont globalFont(m_settings.fontNameOverride, targetFontSize);
         QApplication::setFont(globalFont);
     } else if (targetFontSize != currentFont.pointSize()) {
-        currentFont.setPointSize(m_settings.fontSizeOverride);
+        currentFont.setPointSize(targetFontSize);
         QApplication::setFont(currentFont);
     }
 
     currentFont = QApplication::font();
-    qDebug() << "original font:" << currentFont.family() << currentFont.pointSize() << "pt";
+    qDebug() << "active font:" << currentFont.family() << currentFont.pointSize() << "pt";
 
     //-----------------------------------------------------------------------------------------
 

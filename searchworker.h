@@ -24,7 +24,6 @@ public:
         : QObject(parent), m_searchDir(searchDir), m_searchStringFilename(searchStringFilename), m_searchStringContent(searchStringContent), m_bRegExFilename(bRegExFilename), m_bRegExContent(bRegExContent), m_bFilenameCaseSensitive(bFilenameCaseSensitive), m_bContentCaseSensitive(bContentCaseSensitive), m_cbDirState(cbDirState), m_FileExtTextSet(FileExtTextSet) {}
 
 signals:
-    void fileFound(const QFileInfo &fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
     void filesFoundBatch(const QList<SearchResult> &results);
     void searchStats(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void finished();
@@ -34,7 +33,7 @@ public slots:
     void abort();
 
 private:
-    bool m_abort;
+    std::atomic<bool> m_abort{false};
     QString m_searchDir;
     QString m_searchStringFilename;
     QString m_searchStringContent;

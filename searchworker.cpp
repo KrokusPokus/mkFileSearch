@@ -10,7 +10,6 @@ void SearchWorker::process() {
     QElapsedTimer BenchmarkTimer;
     BenchmarkTimer.start();
 
-    m_abort = false;
     uint iItemsFound = 0;
     uint iNameMatched = 0;
     uint iContentMatched = 0;
@@ -61,9 +60,12 @@ void SearchWorker::process() {
         return;
     }
 
+    QStringList searchStringFilenameSplit = m_searchStringFilename.split(' ', Qt::SkipEmptyParts);
+
     int nameMatchQuality = -1;
     int contentMatchCount = -1;
     QList<SearchResult> resultsBatch;
+    resultsBatch.reserve(1000); // small optimization. no measurable gains though.
 
     QDirIterator iter(m_searchDir, searchFlags, QDirIterator::Subdirectories);
     while (iter.hasNext()) {
@@ -74,7 +76,7 @@ void SearchWorker::process() {
             if (m_bRegExFilename) {
                 nameMatchQuality = getRegExNameMatchQuality(iter.fileInfo(), qreFileName);
             } else {
-                nameMatchQuality = getNameMatchQuality(iter.fileInfo(), m_searchStringFilename, caseSensitivityFilename);
+                nameMatchQuality = getNameMatchQuality(iter.fileInfo(), m_searchStringFilename, searchStringFilenameSplit, caseSensitivityFilename);
             }
 
             if (nameMatchQuality == 0) {
@@ -111,10 +113,9 @@ void SearchWorker::process() {
         if (resultsBatch.size() >= 1000) {
             emit filesFoundBatch(resultsBatch);
             resultsBatch.clear();
-            QCoreApplication::processEvents();
         }
 
-        if (m_abort) {
+        if (m_abort.load()) {
             bSearchInterrupted = true;
             break;
         }

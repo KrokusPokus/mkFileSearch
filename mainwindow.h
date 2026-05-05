@@ -118,7 +118,15 @@ private:
     QTimer *CrcCalcTimer;
     QWidget *topControlsContainerWidget;
 
-
+    QAction *m_actionListViewOpenFiles;
+    QAction *m_actionListViewEditFiles;
+    QAction *m_actionListViewBrowseToFile;
+    QAction *m_actionListViewCopyPaths;
+    QAction *m_actionListViewCutFiles;
+    QAction *m_actionListViewCopyFiles;
+    QAction *m_actionListViewDeleteFiles;
+    QAction *m_actionListViewRenameFiles;
+    QAction *m_actionListViewFileProperties;
 
     QStringList getTablePathList();
     void action_EditSettingsFile();
@@ -130,11 +138,13 @@ private:
     void action_ListViewEditFiles();
     void action_ListViewFileProperties();
     void action_ListViewOpenFiles();
+    void action_ListViewRenameFiles();
     void addFileToTable(const QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
     void calculateVisibleCRCs();
     void finalizeUI();
     void onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void onWorkerSentBatch(const QList<SearchResult> &results);
+    void openFileListWithHandler(const QString &handler, const QStringList &fileList);
     void removeCutMarkers();
     void searchLoop(QString searchDir, QString searchStringFilename, QString searchStringContent, bool bRegExFilename, bool bRegExContent, bool bFilenameCaseSensitive, bool bContentCaseSensitive, Qt::CheckState cbDirState);
     void setupClipboardForCut(QSet<int> rowSet);
@@ -155,12 +165,12 @@ private:
 
     std::atomic<bool> m_bSearchActive{false};
     std::atomic<bool> m_bAbortRequested{false};
+    std::atomic<bool> m_workerHasFinished{false};
     std::atomic<int> m_currentSearchGeneration{0};
-    QMap<QString, QIcon> m_iconCache;
+    QHash<QString, QIcon> m_iconCache;
 
     QQueue<QList<SearchResult>> m_pendingBatches;
     bool m_isProcessingPending = false;
-    bool m_workerHasFinished;
     QByteArray m_currentClipboardToken;
     QSet<int> m_rowsWithCutMarkers;
 

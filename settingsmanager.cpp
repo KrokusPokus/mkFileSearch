@@ -6,8 +6,7 @@ SettingsManager::SettingsManager() {
 }
 
 void SettingsManager::load() {
-	QString settingsFilePath = getSettingsPath();
-	QSettings s(settingsFilePath, QSettings::IniFormat);
+    QSettings s(getSettingsPath(), QSettings::IniFormat);
 
 	// Core
 	useSearchWorker = s.value("Core/UseSearchWorker", true).toBool();
@@ -32,48 +31,67 @@ void SettingsManager::load() {
 	fontSizeOverride     = s.value("Interface/FontSizeOverride", 0).toInt();
 	showGrid             = s.value("Interface/ShowGrid", false).toBool();
 	showPlaceholderText  = s.value("Interface/ShowPlaceholderText", true).toBool();
+    showIconsInMenu      = s.value("Interface/ShowIconsInMenu", true).toBool();
+    showShortcutsInMenu  = s.value("Interface/ShowShortcutsInMenu", true).toBool();
 
-
-
-	// Initiales Speichern, falls Datei nicht existiert (dein Default-Writer)
-	if (!QFile::exists(settingsFilePath)) {
-		save();
-	}
+    save();
 }
 
 void SettingsManager::save() {
-	QString settingsFilePath = QFile::exists("settings.ini") ? "settings.ini" : getSettingsPath();
-	QSettings s(settingsFilePath, QSettings::IniFormat);
+    QSettings s(getSettingsPath(), QSettings::IniFormat);
 
-	s.setValue("Core/UseSearchWorker", useSearchWorker);
+    // Core
+    safeSetValue(s, "Core/UseSearchWorker", useSearchWorker);
 
-	s.setValue("Extensions/FileExtAudio", DEFAULT_AUDIO);
-	s.setValue("Extensions/FileExtImage", DEFAULT_IMAGE);
-	s.setValue("Extensions/FileExtText", DEFAULT_TEXT);
-	s.setValue("Extensions/FileExtVideo", DEFAULT_VIDEO);
+    // Extensions
+    safeSetValue(s, "Extensions/FileExtAudio", formatStringSet(audioExts));
+    safeSetValue(s, "Extensions/FileExtImage", formatStringSet(imageExts));
+    safeSetValue(s, "Extensions/FileExtText", formatStringSet(textExts));
+    safeSetValue(s, "Extensions/FileExtVideo", formatStringSet(videoExts));
 
-    s.setValue("Handlers/AudioEditor", audioEditor);
-    s.setValue("Handlers/ImageEditor", imageEditor);
-    s.setValue("Handlers/TextEditor", textEditor);
-    s.setValue("Handlers/VideoEditor", videoEditor);
-    s.setValue("Handlers/FileManager", fileManager);
-    s.setValue("Handlers/PropertiesDialog", propertiesDialog);
+    // Handlers
+    safeSetValue(s, "Handlers/AudioEditor", audioEditor);
+    safeSetValue(s, "Handlers/ImageEditor", imageEditor);
+    safeSetValue(s, "Handlers/TextEditor", textEditor);
+    safeSetValue(s, "Handlers/VideoEditor", videoEditor);
+    safeSetValue(s, "Handlers/FileManager", fileManager);
+    safeSetValue(s, "Handlers/PropertiesDialog", propertiesDialog);
 
-	s.setValue("Interface/AlternatingRowColors", alternatingRowColors);
-	s.setValue("Interface/FontNameOverride", fontNameOverride);
-	s.setValue("Interface/FontSizeOverride", fontSizeOverride);
-	s.setValue("Interface/ShowGrid", showGrid);
-	s.setValue("Interface/ShowPlaceholderText", showPlaceholderText);
+    // Interface
+    safeSetValue(s, "Interface/AlternatingRowColors", alternatingRowColors);
+    safeSetValue(s, "Interface/FontNameOverride", fontNameOverride);
+    safeSetValue(s, "Interface/FontSizeOverride", fontSizeOverride);
+    safeSetValue(s, "Interface/ShowGrid", showGrid);
+    safeSetValue(s, "Interface/ShowPlaceholderText", showPlaceholderText);
+    safeSetValue(s, "Interface/ShowIconsInMenu", showIconsInMenu);
+    safeSetValue(s, "Interface/ShowShortcutsInMenu", showShortcutsInMenu);
 
+    // Because we used safeSetValue(), the file will only get written if there were changes in values.
 	s.sync();
 }
 
+void SettingsManager::safeSetValue(QSettings &settings, const QString &key, const QVariant &value) {
+    if (settings.value(key) != value) {
+        settings.setValue(key, value);
+    }
+}
+
+QString SettingsManager::formatStringSet(const QSet<QString> &extensionSet) {
+    QStringList stringList = extensionSet.values();
+    stringList.sort(Qt::CaseInsensitive);
+    return stringList.join(",");
+    }
+
 QSet<QString> SettingsManager::parseExtensions(const QString &input) {
+    const QStringList list = input.split(u',', Qt::SkipEmptyParts);
+
 	QSet<QString> set;
-	const QStringList list = input.split(u',', Qt::SkipEmptyParts);
+    set.reserve(list.size());
+
 	for (const QString &s : list) {
 		set.insert(s.trimmed().toLower());
 	}
+
 	return set;
 }
 
@@ -82,10 +100,10 @@ QString SettingsManager::getSettingsPath() {
 	if (QFile::exists("settings.ini")) {
 		settingsFilePath = "settings.ini";
 	} else {
-		// Sucht den Standard-Ordner für Konfigurationsdateien (AppConfigLocation)
+        // Looks up the default folder path for config files (AppConfigLocation)
 		QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
 
-		// Sicherstellen, dass der Ordner existiert (erstellt ihn falls nötig)
+        // Make sure that path exists
 		QDir().mkpath(configDir);
 
 		settingsFilePath = configDir + "/settings.ini";
