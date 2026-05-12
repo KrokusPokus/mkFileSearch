@@ -18,6 +18,15 @@
 #include "searchworker.h"
 #include "settingsmanager.h"
 
+/*
+ * [QTableWidget Qt::UserRole usage]
+ *
+ *  eColName	Qt::UserRole		QString absoluteFilePath
+ *  eColSize	Qt::UserRole + 1	bool trueIcon
+ *  eColSize	Qt::UserRole		qint64 sizeInBytes
+ *  any item	Qt::UserRole + 5	bool isCut
+*/
+
 // Subclass QTableWidget as Custom_QTableWidget where F2 key presses are diverted to the first row's item
 class Custom_QTableWidget : public QTableWidget {
 protected:
@@ -86,9 +95,16 @@ public:
     ~MainWindow() override;
 
 private slots:
-    void onDoubleClick(int row, int column);
     void onItemChanged(QTableWidgetItem *item);
     void onCheckboxClickedCRC(Qt::CheckState state);
+    void onCheckboxClickedRegExName(Qt::CheckState state);
+    void onCheckboxClickedRegExContent(Qt::CheckState state);
+    void onClipboardChanged();
+    void onListViewHeaderClicked();
+    void onListViewItemDoubleClicked(QTableWidgetItem *item);
+    void onShowContextMenu(const QPoint &pos);
+    void onTimedCalcCRC();
+    void onTimedUpdateIcons();
     void onVerticalBarScrollChange();
 
 private:
@@ -115,7 +131,8 @@ private:
     QLineEdit *InputBox2;
     QString currentDirectory;
     QTableWidget *tableWidget;
-    QTimer *CrcCalcTimer;
+    QTimer *m_timerCalcCrc;
+    QTimer *m_timerUpdateIcons;
     QWidget *topControlsContainerWidget;
 
     QAction *m_actionListViewOpenFiles;
@@ -140,20 +157,14 @@ private:
     void action_ListViewOpenFiles();
     void action_ListViewRenameFiles();
     void addFileToTable(const QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
-    void calculateVisibleCRCs();
     void finalizeUI();
     void onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void onWorkerSentBatch(const QList<SearchResult> &results);
     void openFileListWithHandler(const QString &handler, const QStringList &fileList);
     void removeCutMarkers();
-    void searchLoop(QString searchDir, QString searchStringFilename, QString searchStringContent, bool bRegExFilename, bool bRegExContent, bool bFilenameCaseSensitive, bool bContentCaseSensitive, Qt::CheckState cbDirState);
     void setupClipboardForCut(QSet<int> rowSet);
-    void showContextMenu(const QPoint &pos);
     void startSearch();
-    void onClipboardChanged();
     void validateInputBoxRegex();
-    void onCheckboxRegExNameClicked(Qt::CheckState state);
-    void onCheckboxRegExContentClicked(Qt::CheckState state);
 
 
     QPointer<QWidget> m_lastWidget;
@@ -178,7 +189,6 @@ private:
 
 
 protected:
-    void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 };
 #endif // MAINWINDOW_H

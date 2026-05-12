@@ -1,6 +1,8 @@
 #include "helpers.h"
 #include <QMimeType>
 #include <QMimeDatabase>
+#include <QProcess>
+#include <QStandardPaths>
 #include <QRegularExpression>
 #include <zlib.h>
 
@@ -234,4 +236,55 @@ uint getRegExContentMatchCount(const QFileInfo &fileInfo, const QRegularExpressi
     }
 
     return iCount;
+}
+
+void launchDesktopFile(const QFileInfo &fileInfo) {
+    QFile file(fileInfo.filePath());
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+
+    QTextStream in(&file);
+    QString execCommand, execPath;
+    bool inMainSection = false;
+
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+
+        if (line.startsWith('[') && line.endsWith(']')) {
+            if (inMainSection && !execCommand.isEmpty()) break; // if this is a new section but we already got execCommand, break
+            inMainSection = (line == "[Desktop Entry]");
+            continue;
+        }
+
+        if (!inMainSection) continue;
+        if (line.startsWith("Exec=")) execCommand = line.mid(5);
+        else if (line.startsWith("Path=")) execPath = line.mid(5);
+    }
+
+    if (!execCommand.isEmpty()) {
+        execCommand.remove(QRegularExpression("%[uUfFiIcK]"));
+        QString program = execCommand.trimmed();
+        QStringList arguments;
+
+        QStringList tokens = QProcess::splitCommand(program);
+        if (!tokens.isEmpty()) {
+            program = tokens.takeFirst();
+            arguments = tokens;
+        }
+
+        if (!QFileInfo(program).isAbsolute()) {
+            QString absoluteProgram = QStandardPaths::findExecutable(program);
+            if (absoluteProgram.isEmpty()) {
+                qWarning() << "Couldn't find path for binary:" << program;
+                return;
+            }
+            program = absoluteProgram;
+        }
+
+        QString workingDir = execPath.trimmed();
+        if (workingDir.isEmpty()) {
+            workingDir = QFileInfo(program).absolutePath();
+        }
+
+        QProcess::startDetached(program, arguments, workingDir);
+    }
 }

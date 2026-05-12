@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.19)
 project(mkFileSearch LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools)
+
+qt_add_translations(mkFileSearch
+    TS_FILES i18n/mkFileSearch_de.ts
+    SOURCES ${PROJECT_SOURCES}
+)
 
 if(UNIX)
     find_package(ZLIB REQUIRED)
@@ -33,6 +38,7 @@ qt_add_executable(mkFileSearch
     searchworker.h searchworker.cpp
     helpers.h helpers.cpp
     settingsmanager.h settingsmanager.cpp
+    filepropertiesdialog.h filepropertiesdialog.cpp
 
 )
 

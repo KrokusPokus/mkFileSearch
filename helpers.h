@@ -14,5 +14,6 @@ uint getNameMatchQuality(const QFileInfo &fileInfo, const QString &searchStringF
 uint getRegExNameMatchQuality(const QFileInfo &fileInfo, const QRegularExpression &re);
 uint getContentMatchCount(const QFileInfo &fileInfo, const QString &searchStringContent, Qt::CaseSensitivity caseSensitivity, const QSet<QString> &m_FileExtTextSet);
 uint getRegExContentMatchCount(const QFileInfo &fileInfo, const QRegularExpression &re, const QSet<QString> &m_FileExtTextSet);
+void launchDesktopFile(const QFileInfo &fileInfo);
 
 #endif // HELPERS_H

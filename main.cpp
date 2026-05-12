@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QFont>
 #include <QString>
+#include <QTranslator>
 
 #include "mainwindow.h"
 #include "settingsmanager.h"
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(helpOption)) {
         std::cout << qPrintable(parser.helpText()) << std::endl;
-        return 0; // Hier wird app nun ordentlich zerstört!
+        return 0;
     }
 
     if (parser.isSet(versionOption)) {
@@ -44,17 +45,17 @@ int main(int argc, char *argv[])
     }
 
     if (!QDir(pathToScan).exists()) {
-        std::cerr << "Fehler: Pfad existiert nicht." << std::endl;
+        std::cerr << "Error: Path not found." << std::endl;
         return 1;
     }
 
     //-----------------------------------------------------------------------------------------
-    // If neccessary, change application font
+    // If neccessary, override default application font
 
     SettingsManager m_settings;
 
     QFont currentFont = QApplication::font();
-    qDebug() << "original font:" << currentFont.family() << currentFont.pointSize() << "pt";
+    //qDebug() << "original font:" << currentFont.family() << currentFont.pointSize() << "pt";
 
     int targetFontSize = currentFont.pointSize();
 
@@ -70,8 +71,15 @@ int main(int argc, char *argv[])
         QApplication::setFont(currentFont);
     }
 
-    currentFont = QApplication::font();
-    qDebug() << "active font:" << currentFont.family() << currentFont.pointSize() << "pt";
+    //currentFont = QApplication::font();
+    //qDebug() << "active font:" << currentFont.family() << currentFont.pointSize() << "pt";
+
+    //-----------------------------------------------------------------------------------------
+
+    QTranslator translator;
+    if (translator.load(QLocale::system(), "mkFileSearch", "_", ":/i18n")) {
+        app.installTranslator(&translator);
+    }
 
     //-----------------------------------------------------------------------------------------
 

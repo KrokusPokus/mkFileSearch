@@ -8,9 +8,6 @@ SettingsManager::SettingsManager() {
 void SettingsManager::load() {
     QSettings s(getSettingsPath(), QSettings::IniFormat);
 
-	// Core
-	useSearchWorker = s.value("Core/UseSearchWorker", true).toBool();
-
 	// Extensions
 	audioExts = parseExtensions(s.value("Extensions/FileExtAudio", DEFAULT_AUDIO).toString());
 	imageExts = parseExtensions(s.value("Extensions/FileExtImage", DEFAULT_IMAGE).toString());
@@ -18,12 +15,11 @@ void SettingsManager::load() {
 	videoExts = parseExtensions(s.value("Extensions/FileExtVideo", DEFAULT_VIDEO).toString());
 
 	// Handlers
-    audioEditor      = QDir::toNativeSeparators(s.value("Handlers/AudioEditor", "kwave").toString());
-    imageEditor      = QDir::toNativeSeparators(s.value("Handlers/ImageEditor", "gimp").toString());
-    textEditor       = QDir::toNativeSeparators(s.value("Handlers/TextEditor", "kate").toString());
-    videoEditor      = QDir::toNativeSeparators(s.value("Handlers/VideoEditor", "kdenlive").toString());
-    fileManager      = QDir::toNativeSeparators(s.value("Handlers/FileManager", "dolphin").toString());
-	propertiesDialog = QDir::toNativeSeparators(s.value("Handlers/PropertiesDialog").toString());
+    audioEditor      = QDir::toNativeSeparators(s.value("Handlers/AudioEditor", "org.kde.kwave.desktop").toString());
+    imageEditor      = QDir::toNativeSeparators(s.value("Handlers/ImageEditor", "gimp.desktop").toString());
+    textEditor       = QDir::toNativeSeparators(s.value("Handlers/TextEditor", "org.kde.kate.desktop").toString());
+    videoEditor      = QDir::toNativeSeparators(s.value("Handlers/VideoEditor", "org.kde.kdenlive.desktop").toString());
+    fileManager      = QDir::toNativeSeparators(s.value("Handlers/FileManager", "org.kde.dolphin.desktop").toString());
 
 	// Interface
 	alternatingRowColors = s.value("Interface/AlternatingRowColors", true).toBool();
@@ -40,9 +36,6 @@ void SettingsManager::load() {
 void SettingsManager::save() {
     QSettings s(getSettingsPath(), QSettings::IniFormat);
 
-    // Core
-    safeSetValue(s, "Core/UseSearchWorker", useSearchWorker);
-
     // Extensions
     safeSetValue(s, "Extensions/FileExtAudio", formatStringSet(audioExts));
     safeSetValue(s, "Extensions/FileExtImage", formatStringSet(imageExts));
@@ -55,7 +48,6 @@ void SettingsManager::save() {
     safeSetValue(s, "Handlers/TextEditor", textEditor);
     safeSetValue(s, "Handlers/VideoEditor", videoEditor);
     safeSetValue(s, "Handlers/FileManager", fileManager);
-    safeSetValue(s, "Handlers/PropertiesDialog", propertiesDialog);
 
     // Interface
     safeSetValue(s, "Interface/AlternatingRowColors", alternatingRowColors);

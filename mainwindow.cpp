@@ -37,12 +37,13 @@
 #include "mainwindow.h"
 #include "helpers.h"
 #include "searchworker.h"
+#include "filepropertiesdialog.h"
 
 MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     : QMainWindow(parent), currentDirectory(targetDirectory)
 {
     setWindowTitle(QDir::toNativeSeparators(currentDirectory));
-    setWindowIcon(QIcon(":/icons/app.ico"));
+    setWindowIcon(QIcon(":/icons/res/app.ico"));
     resize(728, 545);
 
     QWidget *centralWidget = new QWidget(this);
@@ -66,8 +67,8 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     topControlsVBoxLayout1->addWidget(InputBox2);
 
     if (m_settings.showPlaceholderText == true) {
-        InputBox1->setPlaceholderText("(filename search terms)");
-        InputBox2->setPlaceholderText("(content search terms)");
+        InputBox1->setPlaceholderText(tr("(filename search terms)"));
+        InputBox2->setPlaceholderText(tr("(content search terms)"));
     }
 
     // --------------------------------------------------------------------
@@ -90,11 +91,11 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     //topControlsVBoxLayout3->setSpacing(15);
     topControlsVBoxLayout3->setContentsMargins(5, 5, 5, 5);
 
-    CheckboxNameCaseSense = new QCheckBox("CaseSense");
+    CheckboxNameCaseSense = new QCheckBox(tr("CaseSense"));
     CheckboxNameCaseSense->setChecked(false);
     topControlsVBoxLayout3->addWidget(CheckboxNameCaseSense);
 
-    CheckboxContentCaseSense = new QCheckBox("CaseSense");
+    CheckboxContentCaseSense = new QCheckBox(tr("CaseSense"));
     CheckboxContentCaseSense->setChecked(false);
     topControlsVBoxLayout3->addWidget(CheckboxContentCaseSense);
 
@@ -104,12 +105,12 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     //topControlsVBoxLayout4->setSpacing(15);
     topControlsVBoxLayout4->setContentsMargins(5, 5, 25, 5);
 
-    CheckboxDirectories = new QCheckBox("Directories");
+    CheckboxDirectories = new QCheckBox(tr("Directories"));
     CheckboxDirectories->setChecked(false);
     CheckboxDirectories->setTristate(true);
     topControlsVBoxLayout4->addWidget(CheckboxDirectories);
 
-    CheckboxCRC = new QCheckBox("CRC32");
+    CheckboxCRC = new QCheckBox(tr("CRC"));
     CheckboxCRC->setChecked(false);
     topControlsVBoxLayout4->addWidget(CheckboxCRC);
 
@@ -132,13 +133,13 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
 
     tableWidget = new Custom_QTableWidget();
     tableWidget->setItemDelegate(new CutDelegate(this));
-    tableWidget->setEditTriggers(QAbstractItemView::EditKeyPressed);
+    tableWidget->setEditTriggers(QAbstractItemView::EditKeyPressed);    // QAbstractItemView::NoEditTriggers
     tableWidget->setStyleSheet("QTableWidget { border: none; }");
     tableWidget->verticalHeader()->setVisible(false);
     tableWidget->verticalHeader()->setMinimumSectionSize(0);
     tableWidget->verticalHeader()->setDefaultSectionSize(18);
     tableWidget->setColumnCount(8);
-    tableWidget->setHorizontalHeaderLabels({"Name", "Subfolder", "Size", "Changed", "Type", "Rating", "Count", "CRC"});
+    tableWidget->setHorizontalHeaderLabels({tr("Name"), tr("Subfolder"), tr("Size"), tr("Changed"), tr("Type"), tr("Rating"), tr("Count"), tr("CRC")});
 
     tableWidget->setColumnWidth(eColName, 160);
     tableWidget->setColumnWidth(eColSubpath, 160);
@@ -166,6 +167,13 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
 
     tableWidget->setAlternatingRowColors(m_settings.alternatingRowColors);
     tableWidget->setShowGrid(m_settings.showGrid);
+    tableWidget->setColumnHidden(eColCRC, true);
+
+    tableWidget->resizeColumnToContents(eColSize);
+    tableWidget->resizeColumnToContents(eColDate);
+    tableWidget->resizeColumnToContents(eColType);
+    tableWidget->resizeColumnToContents(eColQuality);
+    tableWidget->resizeColumnToContents(eColCount);
 
     // --------------------------------------------------------------------
 
@@ -238,8 +246,8 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
 
     m_actionListViewFileProperties = new QAction(tr("Properties"), this);
     m_actionListViewFileProperties->setIcon(QIcon::fromTheme("document-properties"));
-    //m_actionListViewFileProperties->setShortcut(QKeySequence("Ctrl+I"));
-    //m_actionListViewFileProperties->setShortcutContext(Qt::WidgetShortcut);
+    m_actionListViewFileProperties->setShortcut(QKeySequence("Ctrl+I"));
+    m_actionListViewFileProperties->setShortcutContext(Qt::WidgetShortcut);
     tableWidget->addAction(m_actionListViewFileProperties);
     connect(m_actionListViewFileProperties, &QAction::triggered, this, &MainWindow::action_ListViewFileProperties);
 
@@ -371,9 +379,13 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
 
     // --------------------------------------------------------------------
 
-    CrcCalcTimer = new QTimer(this);
-    CrcCalcTimer->setSingleShot(true);
-    connect(CrcCalcTimer, &QTimer::timeout, this, &MainWindow::calculateVisibleCRCs);
+    m_timerCalcCrc = new QTimer(this);
+    m_timerCalcCrc->setSingleShot(true);
+    connect(m_timerCalcCrc, &QTimer::timeout, this, &MainWindow::onTimedCalcCRC);
+
+    m_timerUpdateIcons = new QTimer(this);
+    m_timerUpdateIcons->setSingleShot(true);
+    connect(m_timerUpdateIcons, &QTimer::timeout, this, &MainWindow::onTimedUpdateIcons);
 
     connect(InputBox1, &QLineEdit::returnPressed, this, &MainWindow::startSearch);
     connect(InputBox2, &QLineEdit::returnPressed, this, &MainWindow::startSearch);
@@ -381,42 +393,49 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     connect(InputBox2, &QLineEdit::textChanged, this, &MainWindow::validateInputBoxRegex);
     connect(CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::validateInputBoxRegex);
     connect(CheckboxRegExContent, &QCheckBox::checkStateChanged, this, &MainWindow::validateInputBoxRegex);
-    connect(tableWidget, &Custom_QTableWidget::cellDoubleClicked, this, &MainWindow::onDoubleClick);
     connect(tableWidget, &Custom_QTableWidget::itemChanged, this, &MainWindow::onItemChanged);
-    connect(tableWidget, &QTableWidget::customContextMenuRequested, this, &MainWindow::showContextMenu);
+    connect(tableWidget, &Custom_QTableWidget::customContextMenuRequested, this, &MainWindow::onShowContextMenu);
+    connect(tableWidget, &Custom_QTableWidget::itemDoubleClicked, this, &MainWindow::onListViewItemDoubleClicked);
     connect(CheckboxCRC, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxClickedCRC);
-    connect(CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxRegExNameClicked);
-    connect(CheckboxRegExContent, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxRegExContentClicked);
+    connect(CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxClickedRegExName);
+    connect(CheckboxRegExContent, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxClickedRegExContent);
     connect(tableWidget->verticalScrollBar(), &QScrollBar::valueChanged, this, &MainWindow::onVerticalBarScrollChange);
+    connect(tableWidget->horizontalHeader(), &QHeaderView::sectionClicked, this, &MainWindow::onListViewHeaderClicked);
     connect(QApplication::clipboard(), &QClipboard::dataChanged, this, &MainWindow::onClipboardChanged);
 }
 
 MainWindow::~MainWindow() = default;
 
-void MainWindow::onCheckboxRegExNameClicked(Qt::CheckState state) {
+void MainWindow::onCheckboxClickedRegExName(Qt::CheckState state) {
     if (state == Qt::Unchecked) {
-        InputBox1->setPlaceholderText("(filename search terms)");
+        InputBox1->setPlaceholderText(tr("(filename search terms)"));
     } else {
-        InputBox1->setPlaceholderText("(filename regex expression)");
+        InputBox1->setPlaceholderText(tr("(filename regex expression)"));
     }
 }
 
-void MainWindow::onCheckboxRegExContentClicked(Qt::CheckState state) {
+void MainWindow::onCheckboxClickedRegExContent(Qt::CheckState state) {
     if (state == Qt::Unchecked) {
-        InputBox2->setPlaceholderText("(content search terms)");
+        InputBox2->setPlaceholderText(tr("(content search terms)"));
     } else {
-        InputBox2->setPlaceholderText("(content regex expression)");
+        InputBox2->setPlaceholderText(tr("(content regex expression)"));
     }
 }
 
 void MainWindow::onCheckboxClickedCRC(Qt::CheckState state) {
-    CrcCalcTimer->start(100);
+    tableWidget->setColumnHidden(eColCRC, !state);
+    m_timerCalcCrc->start(100);
 }
 
 void MainWindow::onVerticalBarScrollChange() {
-    CrcCalcTimer->start(100);
+    m_timerCalcCrc->start(100);
+    m_timerUpdateIcons->start(100);
 }
 
+void MainWindow::onListViewHeaderClicked() {
+    m_timerCalcCrc->start(100);
+    m_timerUpdateIcons->start(100);
+}
 void MainWindow::validateInputBoxRegex() {
     QString InputBox1Text = InputBox1->text();
     QString InputBox2Text = InputBox2->text();
@@ -452,16 +471,16 @@ void MainWindow::validateInputBoxRegex() {
     }
 }
 
-void MainWindow::calculateVisibleCRCs() {
+void MainWindow::onTimedCalcCRC() {
     if (m_bSearchActive.load() || (tableWidget->rowCount() == 0)) {
         return;
     }
 
-    int firstVisible = tableWidget->indexAt(QPoint(0, 0)).row();
-    // Substract 1 pixel to make sure we're in the viewport
-    int lastVisible = tableWidget->indexAt(QPoint(0, tableWidget->viewport()->height() - 1)).row();
-    if (lastVisible == -1) lastVisible = tableWidget->rowCount() - 1;
-
+    int firstVisible = tableWidget->rowAt(0);
+    int lastVisible = tableWidget->rowAt(tableWidget->viewport()->height() - 1);    // Substract 1 pixel to make sure we're in the viewport
+    if (lastVisible == -1) {
+        lastVisible = tableWidget->rowCount() - 1;
+    }
     if ((firstVisible == -1) || (lastVisible == -1)) {
         return;
     }
@@ -549,15 +568,16 @@ void MainWindow::startSearch() {
     m_bSearchActive = true;
     m_bAbortRequested = false;
 
+
     m_BenchmarkTimer.start();
 
     m_workerHasFinished = false;
     m_isProcessingPending = false;
 
+    m_SearchStats_bSearchInterrupted = false;
     m_SearchStats_iItemsFound = 0;
     m_SearchStats_iNameMatched = 0;
     m_SearchStats_iContentMatched = 0;
-    m_SearchStats_bSearchInterrupted = false;
 
     m_lastWidget = QApplication::focusWidget();
     // Reset focus to lineEdit widget of the same row after search
@@ -577,137 +597,28 @@ void MainWindow::startSearch() {
 
     setWindowTitle(QDir::toNativeSeparators(currentDirectory) + "   (Searching)");
     m_currentSearchGeneration++; // Make old crc calc threads invalid to prevent seg faults from Use-After-Free
-    tableWidget->setRowCount(0);
+
     tableWidget->setUpdatesEnabled(false);
+    tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);  // Important!! Calculations of header don't get stopped by "tableWidget->setUpdatesEnabled(false)"
+    tableWidget->setRowCount(0);
     tableWidget->setSortingEnabled(false);
     tableWidget->blockSignals(true);  // block "itemChanged" signals
 
-    if (m_settings.useSearchWorker) {
-        QThread* thread = new QThread;
-        SearchWorker* worker = new SearchWorker(currentDirectory, InputBox1Text, InputBox2Text, bRegExFilename, bRegExContent, CheckboxNameCaseSense->isChecked(), CheckboxContentCaseSense->isChecked(), CheckboxDirectories->checkState(), m_settings.textExts);
-        worker->moveToThread(thread);
+    QThread* thread = new QThread;
+    SearchWorker* worker = new SearchWorker(currentDirectory, InputBox1Text, InputBox2Text, bRegExFilename, bRegExContent, CheckboxNameCaseSense->isChecked(), CheckboxContentCaseSense->isChecked(), CheckboxDirectories->checkState(), m_settings.textExts);
+    worker->moveToThread(thread);
 
-        // Verbindungen
-        connect(thread, &QThread::started, worker, &SearchWorker::process);
-        connect(worker, &SearchWorker::filesFoundBatch, this, &MainWindow::onWorkerSentBatch);
-        connect(worker, &SearchWorker::searchStats, this, &MainWindow::onWorkerFinished);   // 1. Store result info
-        connect(worker, &SearchWorker::finished, thread, &QThread::quit);                   // 2. Stop thread
-        connect(worker, &SearchWorker::finished, worker, &SearchWorker::deleteLater);       // 3. Clean up object
-        connect(thread, &QThread::finished, thread, &QThread::deleteLater);                 // 4. Clean up thread
+    // Verbindungen
+    connect(thread, &QThread::started, worker, &SearchWorker::process);
+    connect(worker, &SearchWorker::filesFoundBatch, this, &MainWindow::onWorkerSentBatch);
+    connect(worker, &SearchWorker::searchStats, this, &MainWindow::onWorkerFinished);   // 1. Store result info
+    connect(worker, &SearchWorker::finished, thread, &QThread::quit);                   // 2. Stop thread
+    connect(worker, &SearchWorker::finished, worker, &SearchWorker::deleteLater);       // 3. Clean up object
+    connect(thread, &QThread::finished, thread, &QThread::deleteLater);                 // 4. Clean up thread
 
-        connect(this, &MainWindow::abortSearchWorkerRequested, worker, &SearchWorker::abort, Qt::DirectConnection);   // React to "Escape" key press
+    connect(this, &MainWindow::abortSearchWorkerRequested, worker, &SearchWorker::abort, Qt::DirectConnection);   // React to "Escape" key press
 
-        thread->start();
-    } else {
-        searchLoop(currentDirectory, InputBox1Text, InputBox2Text, bRegExFilename, bRegExContent, CheckboxNameCaseSense->isChecked(), CheckboxContentCaseSense->isChecked(), CheckboxDirectories->checkState());
-    }
-}
-
-void MainWindow::searchLoop(QString searchDir, QString searchStringFilename, QString searchStringContent, bool bRegExFilename, bool bRegExContent, bool bFilenameCaseSensitive, bool bContentCaseSensitive, Qt::CheckState cbDirState) {
-    int iLenRem = searchDir.length();
-    bool bSearchStringFilenameEmpty = searchStringFilename.trimmed().isEmpty();
-    bool bsearchStringContentEmpty = searchStringContent.trimmed().isEmpty();
-
-    if (!searchDir.endsWith(QDir::separator())) {
-        iLenRem++;
-    }
-
-    QDir::Filters searchFlags = QDir::Hidden | QDir::NoDotAndDotDot | QDir::System; // QDir::System needed for *.lnk files on Windows
-
-    if (cbDirState == Qt::Unchecked) {
-        searchFlags = searchFlags | QDir::Files;
-    } else if (cbDirState == Qt::PartiallyChecked) {
-        searchFlags = searchFlags | QDir::Files | QDir::Dirs;
-    } else /* if (cbDirState == Qt::Checked) */ {
-        searchFlags = searchFlags | QDir::Dirs;
-    }
-
-    QRegularExpression::PatternOptions reOptionsFilename = QRegularExpression::NoPatternOption;
-    Qt::CaseSensitivity caseSensitivityFilename = Qt::CaseSensitive;
-    if (!bFilenameCaseSensitive) {
-        reOptionsFilename |= QRegularExpression::CaseInsensitiveOption;
-        caseSensitivityFilename = Qt::CaseInsensitive;
-    }
-
-    QRegularExpression qreFileName(searchStringFilename, reOptionsFilename);
-    if (!qreFileName.isValid() && bRegExFilename) {
-        // The user typed an invalid Regex (e.g., unmatched brackets)
-        qDebug() << "Invalid name field Regex:" << qreFileName.errorString();
-        return;
-    }
-
-    QRegularExpression::PatternOptions reOptionsContent = QRegularExpression::NoPatternOption;
-    Qt::CaseSensitivity caseSensitivityContent = Qt::CaseSensitive;
-    if (!bContentCaseSensitive) {
-        reOptionsContent |= QRegularExpression::CaseInsensitiveOption;
-        caseSensitivityContent = Qt::CaseInsensitive;
-    }
-
-    QRegularExpression qreContent(searchStringContent, reOptionsContent);
-    if (!qreContent.isValid() && bRegExContent) {
-        // The user typed an invalid Regex (e.g., unmatched brackets)
-        qDebug() << "Invalid content field Regex:" << qreContent.errorString();
-        return;
-    }
-
-    QStringList searchStringFilenameSplit = searchStringFilename.split(' ', Qt::SkipEmptyParts);
-
-    int nameMatchQuality = -1;
-    int contentMatchCount = -1;
-    uint iRow = 0;
-
-    QDirIterator iter(searchDir, searchFlags, QDirIterator::Subdirectories);
-    while (iter.hasNext()) {
-        iter.next();
-        m_SearchStats_iItemsFound++;
-
-        if (!bSearchStringFilenameEmpty) {
-            if (bRegExFilename) {
-                nameMatchQuality = getRegExNameMatchQuality(iter.fileInfo(), qreFileName);
-            } else {
-                nameMatchQuality = getNameMatchQuality(iter.fileInfo(), searchStringFilename, searchStringFilenameSplit, caseSensitivityFilename);
-            }
-
-            if (nameMatchQuality == 0) {
-                continue;
-            }
-        }
-
-
-        if (!bsearchStringContentEmpty) {
-            if (bRegExContent) {
-                contentMatchCount = getRegExContentMatchCount(iter.fileInfo(), qreContent, m_settings.textExts);
-            } else {
-                contentMatchCount = getContentMatchCount(iter.fileInfo(), searchStringContent, caseSensitivityContent, m_settings.textExts);
-            }
-
-            if (contentMatchCount == 0) {
-                continue;
-            }
-
-            m_SearchStats_iContentMatched += contentMatchCount;
-        }
-
-        m_SearchStats_iNameMatched++;
-
-        if (tableWidget->rowCount() < iRow + 1) {
-            // tableWidget->insertRow(iRow); // slower
-            tableWidget->setRowCount(tableWidget->rowCount() + 20000);  // ~ 7% search time decrease
-        }
-
-        addFileToTable(iter.fileInfo(), iRow, iLenRem, nameMatchQuality, contentMatchCount);
-        iRow++;
-
-        if (iRow % 2000 == 0) {
-            QCoreApplication::processEvents();
-            if (m_bAbortRequested) break;
-        }
-    }
-
-    if (tableWidget->rowCount() > iRow)
-        tableWidget->setRowCount(iRow); // shrink to actual size in case we allocated too many empty rows
-
-    finalizeUI();
+    thread->start();
 }
 
 void MainWindow::onWorkerSentBatch(const QList<SearchResult> &batch) {
@@ -904,17 +815,17 @@ void MainWindow::finalizeUI() {
     tableWidget->resizeColumnToContents(eColType);
     tableWidget->resizeColumnToContents(eColQuality);
     tableWidget->resizeColumnToContents(eColCount);
-    tableWidget->resizeColumnToContents(eColCRC);
+    //tableWidget->resizeColumnToContents(eColCRC);
 
     QString titleString;
     QString InputBox2Text = InputBox2->text();
 
     if (m_SearchStats_bSearchInterrupted == true || m_bAbortRequested) {
-        titleString = QString("Search aborted...");
+        titleString = QString(tr("Search aborted..."));
     } else if (InputBox2Text.trimmed().isEmpty()) {
-        titleString = QString("%1   (%2 hits in %3 items)").arg(QDir::toNativeSeparators(currentDirectory), QLocale::system().toString(m_SearchStats_iNameMatched), QLocale::system().toString(m_SearchStats_iItemsFound));
+        titleString = QString(tr("%1 (%2 hits in %3 items)")).arg(QDir::toNativeSeparators(currentDirectory), QLocale::system().toString(m_SearchStats_iNameMatched), QLocale::system().toString(m_SearchStats_iItemsFound));
     } else {
-        titleString = QString("%1   (%2 matches spread across %3 files of %4 searched)").arg(QDir::toNativeSeparators(currentDirectory), QLocale::system().toString(m_SearchStats_iContentMatched), QLocale::system().toString(m_SearchStats_iNameMatched), QLocale::system().toString(m_SearchStats_iItemsFound));
+        titleString = QString(tr("%1 (%2 matches spread across %3 files of %4 searched)")).arg(QDir::toNativeSeparators(currentDirectory), QLocale::system().toString(m_SearchStats_iContentMatched), QLocale::system().toString(m_SearchStats_iNameMatched), QLocale::system().toString(m_SearchStats_iItemsFound));
     }
 
     setWindowTitle(titleString);
@@ -931,20 +842,8 @@ void MainWindow::finalizeUI() {
     }
 
     qDebug() << "m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of search for " << titleString;
-}
-
-void MainWindow::onDoubleClick(int row, int column) {
-    // Wir holen uns das Item aus der ersten Spalte (Index 0),
-    // weil wir dort den Pfad versteckt haben.
-    QTableWidgetItem *item = tableWidget->item(row, eColName);
-
-    if (item) {
-        QString fullPath = item->data(Qt::UserRole).toString();
-        if (!fullPath.isEmpty()) {
-            //QProcess::startDetached("xdg-open", {fullPath});
-            QDesktopServices::openUrl(QUrl::fromLocalFile(fullPath));
-        }
-    }
+    m_timerCalcCrc->start(100);
+    m_timerUpdateIcons->start(100);
 }
 
 void MainWindow::onItemChanged(QTableWidgetItem *item) {
@@ -972,13 +871,7 @@ void MainWindow::onItemChanged(QTableWidgetItem *item) {
     }
 }
 
-void MainWindow::resizeEvent(QResizeEvent *event) {
-    // Rufe die Basisklasse auf, damit das Layout normal weiterarbeitet
-    QMainWindow::resizeEvent(event);
-    CrcCalcTimer->start(100);
-}
-
-void MainWindow::showContextMenu(const QPoint &pos) {
+void MainWindow::onShowContextMenu(const QPoint &pos) {
     QTableWidgetItem *item = tableWidget->itemAt(pos);
     if (!item) return;
 
@@ -1035,16 +928,34 @@ QStringList MainWindow::getTablePathList() {
     return pathList;
 }
 
+void MainWindow::onListViewItemDoubleClicked(QTableWidgetItem *item) {
+    action_ListViewOpenFiles();
+}
+
 void MainWindow::action_ListViewOpenFiles() {
     //QStringList pathList = getTablePathList();
-
     QTableWidgetItem *item = tableWidget->currentItem();
     if (!item) return;
 
     QString path = tableWidget->item(item->row(), eColName)->data(Qt::UserRole).toString();
-    //QString nativePath = QDir::toNativeSeparators(path);
+    QFileInfo fileInfo(path);
 
-    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    if (!fileInfo.exists()) {
+        return;
+    }
+
+    QString fileExt = fileInfo.suffix().toLower();
+
+    if (fileExt == "desktop") {
+        launchDesktopFile(fileInfo);
+#if defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
+    } else if (fileInfo.isExecutable() && !fileInfo.isDir() && !m_settings.audioExts.contains(fileExt) && !m_settings.imageExts.contains(fileExt) && !m_settings.videoExts.contains(fileExt)) {
+        // Workaround on linux where executible files are not neccessarily executed when opened via QDesktopServices::openUrl().
+        QProcess::startDetached(path, QStringList(), fileInfo.absolutePath());
+#endif
+    } else {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    }
 }
 
 void MainWindow::action_ListViewEditFiles() {
@@ -1111,14 +1022,46 @@ void MainWindow::openFileListWithHandler(const QString &handlerApp, const QStrin
     QString appPath = handlerApp;
 
     if (!QFile::exists(appPath)) {
+        // Doesn't seem to be an absolute path...
+        qDebug() << "Error: " << handlerApp << " not found with QFile::exists('appName').";
+
         appPath = QStandardPaths::findExecutable(handlerApp);
         if (appPath.isEmpty()) {
-            qDebug() << "Fehler: " << handlerApp << " ist nicht installiert.";
-            return;
+            // Can't find any executables of that name in the standard paths either...
+            qDebug() << "Error: " << handlerApp << " not found with QStandardPaths::findExecutable('appName').";
+
+            QString desktopFilePath = QStandardPaths::locate(QStandardPaths::ApplicationsLocation, handlerApp);
+            if (desktopFilePath.isEmpty()) {
+                // Not a desktop file either...
+                qDebug() << "Error: " << handlerApp << " not found with QStandardPaths::locate(QStandardPaths::ApplicationsLocation, 'appName').";
+                return;
+            } else {
+                QSettings desktopFile(desktopFilePath, QSettings::IniFormat);
+                desktopFile.beginGroup("Desktop Entry");
+                QString execCommand = desktopFile.value("Exec").toString();
+
+                // Remove placeholders like %u, %f, etc.
+                execCommand.replace(QRegularExpression("%[a-zA-Z]"), "");
+                QString program = execCommand.trimmed();
+                QStringList arguments = fileList;
+
+                QStringList tokens = QProcess::splitCommand(program);
+                if (!tokens.isEmpty()) {
+                    program = tokens.takeFirst();
+                    arguments = tokens << fileList;
+                }
+
+                qDebug() << "Opening files with  QProcess::startDetached('" + program + "' , fileList)";
+                QProcess::startDetached(program, arguments);
+                return;
+            }
         }
     }
 
     QString nativePath = QDir::toNativeSeparators(appPath);
+
+    qDebug() << "Opening files with  QProcess::startDetached('" + nativePath + "' , fileList)";
+
     // bool QProcess::startDetached(const QString &program, const QStringList &arguments = {}, const QString &workingDirectory = QString(), qint64 *pid = nullptr)
     QProcess::startDetached(nativePath, fileList);
 }
@@ -1176,21 +1119,21 @@ void MainWindow::action_ListViewDeleteFiles(bool bRecycleOnly) {
         iIcon = QMessageBox::Question;
         sWarning = "";
         if (rowSet.size() == 1) {
-            sTitle = "Datei löschen";
-            sText = QString("Möchtest du diese Datei wirklich in den Papierkorb verschieben?");
+            sTitle = tr("Delete File");
+            sText = tr("Do you really want to move this file into the recycle bin?");
         } else {
-            sTitle = "Mehrere Elemente löschen";
-            sText = QString("Möchtest du diese %1 Dateien wirklich in den Papierkorb verschieben?").arg(rowSet.size());
+            sTitle = tr("Delete multiple elements");
+            sText = QString(tr("Do you really want to move these %1 files into the recylce bin?")).arg(rowSet.size());
         }
     } else {
         iIcon = QMessageBox::Warning;
-        sWarning = "<p style='color: red;'><i>Dieser Vorgang kann nicht rückgängig gemacht werden.</i></p>";
+        sWarning = "<p style='color: red;'><i>" + tr("This process cannot be undone.") + "</i></p>";
         if (rowSet.size() == 1) {
-            sTitle = "Datei löschen";
-            sText = QString("Möchtest du diese Datei wirklich unwiderruflich löschen?");
+            sTitle = tr("Delete File");
+            sText = tr("Are you sure you want to delete this file permanently?");
         } else {
-            sTitle = "Mehrere Elemente löschen";
-            sText = QString("Möchtest du diese %1 Dateien wirklich unwiderruflich löschen?").arg(rowSet.size());
+            sTitle = tr("Delete multiple elements");
+            sText = QString(tr("Are you sure you want to delete these %1 files permanently?")).arg(rowSet.size());
         }
     }
 
@@ -1238,15 +1181,15 @@ void MainWindow::action_ListViewDeleteFiles(bool bRecycleOnly) {
         QString imgBase64 = ba.toBase64();
 
         msgBox.setText(QString("<h3>%1</h3>").arg(sText));
-        msgBox.setInformativeText(QString("<table width='100%' cellspacing='0' cellpadding='0'><tr><td rowspan=4 width='48' valign='top' style='padding-right: 10px;'><img src='data:image/png;base64,%1'></td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;' width='1%'>Name:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%2</td></tr><tr><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>Größe:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%3</td></tr><tr><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>Datum:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%4</td></tr><tr><td colspan=2 style='padding-top: 8px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%5</td></tr></table>").arg(imgBase64, fileName, size, lastModified, sWarning));
+        msgBox.setInformativeText(QString(tr("<table width='100%' cellspacing='0' cellpadding='0'><tr><td rowspan=4 width='48' valign='top' style='padding-right: 10px;'><img src='data:image/png;base64,%1'></td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;' width='1%'>Name:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%2</td></tr><tr><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>Size:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%3</td></tr><tr><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>Date:</td><td style='color: #555; padding-top: 2px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%4</td></tr><tr><td colspan=2 style='padding-top: 8px; padding-bottom: 2px; padding-left: 8px; padding-right: 8px;'>%5</td></tr></table>")).arg(imgBase64, fileName, size, lastModified, sWarning));
     } else {
         //msgBox.setText(sText);
         msgBox.setText(QString("<h3>%1</h3>").arg(sText));
         msgBox.setInformativeText(sWarning);
     }
 
-    QPushButton *deleteButton = msgBox.addButton("Löschen", QMessageBox::AcceptRole);
-    msgBox.addButton("Abbrechen", QMessageBox::RejectRole);
+    QPushButton *deleteButton = msgBox.addButton(tr("Delete"), QMessageBox::AcceptRole);
+    msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
     msgBox.setDefaultButton(deleteButton);
     deleteButton->setStyleSheet("QPushButton { font-weight: bold; min-width: 80px; }");
 
@@ -1452,19 +1395,59 @@ void MainWindow::action_ListViewFileProperties() {
         return;
     }
 
-    if (!m_settings.propertiesDialog.isEmpty()) {
-        QProcess::startDetached(m_settings.propertiesDialog, pathList);
-    }
+    auto *dialog = new FilePropertiesDialog(pathList);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
+    dialog->raise();
+    dialog->activateWindow();
 }
 
 void MainWindow::action_EditSettingsFile() {
     QDesktopServices::openUrl(QUrl::fromLocalFile(m_settings.getSettingsPath()));
 }
 
+void MainWindow::onTimedUpdateIcons() {
+    if (m_bSearchActive.load() || (tableWidget->rowCount() == 0)) {
+        return;
+    }
+
+    int firstVisible = tableWidget->rowAt(0);
+    int lastVisible = tableWidget->rowAt(tableWidget->viewport()->height() - 1);    // Substract 1 pixel to make sure we're in the viewport
+    if (lastVisible == -1) {
+        lastVisible = tableWidget->rowCount() - 1;
+    }
+    if ((firstVisible == -1) || (lastVisible == -1)) {
+        return;
+    }
+
+    for (int i = firstVisible; i <= lastVisible; ++i) {
+        QTableWidgetItem *nameItem = tableWidget->item(i, eColName);
+        if (nameItem) {
+            QString fullPath = nameItem->data(Qt::UserRole).toString();
+            if (!fullPath.isEmpty()) {
+                if (nameItem->data(Qt::UserRole + 1).toBool() == false) {
+                    nameItem->setData(Qt::UserRole + 1, true);  // set true so we don't update this item's icon.
+
+                    QFileInfo fileInfo(fullPath);
+                    QIcon trueIcon = m_iconProvider.icon(fileInfo);
+                    nameItem->setIcon(trueIcon);
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Misc
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == tableWidget->viewport()) {
+        if (event->type() == QEvent::Resize) {
+            m_timerCalcCrc->start(100);
+            m_timerUpdateIcons->start(100);
+        }
+    }
+
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
 
