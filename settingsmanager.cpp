@@ -1,5 +1,7 @@
-#include "settingsmanager.h"
+#include <QCoreApplication>
 #include <QFile>
+
+#include "settingsmanager.h"
 
 SettingsManager::SettingsManager() {
 	load(); // Lädt beim Erstellen automatisch
@@ -88,9 +90,9 @@ QSet<QString> SettingsManager::parseExtensions(const QString &input) {
 }
 
 QString SettingsManager::getSettingsPath() {
-	QString settingsFilePath;
-	if (QFile::exists("settings.ini")) {
-		settingsFilePath = "settings.ini";
+    QString iniFilePath;
+    if (QFile::exists(QCoreApplication::applicationDirPath() + "/settings.ini")) {
+        iniFilePath = QCoreApplication::applicationDirPath() + "/settings.ini";
 	} else {
         // Looks up the default folder path for config files (AppConfigLocation)
 		QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
@@ -98,7 +100,7 @@ QString SettingsManager::getSettingsPath() {
         // Make sure that path exists
 		QDir().mkpath(configDir);
 
-		settingsFilePath = configDir + "/settings.ini";
+        iniFilePath = configDir + "/settings.ini";
 	}
-	return settingsFilePath;
+    return iniFilePath;
 }

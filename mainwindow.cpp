@@ -624,52 +624,41 @@ void MainWindow::startSearch() {
 void MainWindow::onWorkerSentBatch(const QList<SearchResult> &batch) {
     m_pendingBatches.enqueue(batch);
 
-    // Wenn bereits eine Verarbeitungsschleife läuft, beenden wir diesen Aufruf.
-    // Die laufende Schleife wird unseren Batch später automatisch aus der Queue holen.
+    // Wenn wir schon verarbeiten, macht die laufende Schleife weiter.
     if (m_isProcessingPending) return;
 
-    // Wir sind der "Master"-Aufruf. Wir starten die Verarbeitung.
     m_isProcessingPending = true;
+    processNextBatch(); // Wir starten die Kette
+}
 
-    while (!m_pendingBatches.isEmpty()) {
-        // We've set the batch size to 1000 in the SearchWorker, which on my system takes around 10 ms.
-        // It should be fine (converning UI-responsiveness) to processEvents() every 10 ms.
-        QCoreApplication::processEvents();
-        if (m_bAbortRequested) break;
+void MainWindow::processNextBatch() {
+    if (m_pendingBatches.isEmpty()) {
+        m_isProcessingPending = false;
 
-        // Fetch next batch from queue
-        QList<SearchResult> currentBatch = m_pendingBatches.dequeue();
-        if (currentBatch.isEmpty()) {
-            continue;
+        if (m_workerHasFinished) {
+            finalizeUI();
         }
-
-        int currentRows = tableWidget->rowCount();
-        int newItemsCount = currentBatch.size();
-
-        tableWidget->setRowCount(currentRows + newItemsCount);
-
-        for (int i = 0; i < newItemsCount; ++i) {
-            int targetRow = currentRows + i;
-            const auto &res = currentBatch.at(i);
-
-            QFileInfo fileInfo = res.fileInfo;
-            int iLenRem = res.iLenRem;
-            int nameMatchQuality = res.nameMatchQuality;
-            int contentMatchCount = res.contentMatchCount;
-
-            addFileToTable(fileInfo, targetRow, iLenRem, nameMatchQuality, contentMatchCount);
-        }
+        return;
     }
 
     if (m_bAbortRequested) {
         m_pendingBatches.clear();
+        m_isProcessingPending = false;
+        return;
     }
 
-    m_isProcessingPending = false;
+    // Einen Batch verarbeiten
+    QList<SearchResult> currentBatch = m_pendingBatches.dequeue();
+    int currentRows = tableWidget->rowCount();
+    tableWidget->setRowCount(currentRows + currentBatch.size());
 
-    if (m_workerHasFinished) {
-        finalizeUI();
+    for (int i = 0; i < currentBatch.size(); ++i) {
+        addFileToTable(currentBatch.at(i).fileInfo, currentRows + i, currentBatch.at(i).iLenRem, currentBatch.at(i).nameMatchQuality, currentBatch.at(i).contentMatchCount);
     }
+
+    // Der Clou: Wir planen den nächsten Batch für "sofort, wenn Zeit ist"
+    // Das verhindert den "Wiedereintritt"-Fehler (Reentrancy)
+    QTimer::singleShot(0, this, &MainWindow::processNextBatch);
 }
 
 void MainWindow::addFileToTable(QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount) {
@@ -727,7 +716,7 @@ void MainWindow::addFileToTable(QFileInfo fileInfo, int iRow, int iLenRem, int n
     tableWidget->setItem(iRow, eColSubpath, pathItem);
 
     // Size (right aligned)
-    qint64 sizeInBytes = fileInfo.size();
+    quint64 sizeInBytes = fileInfo.size();
     SizeTableItem *sizeItem = new SizeTableItem(formatAdaptiveSize(sizeInBytes));     // Using sublass "sizeItem" in place of "QTableWidgetItem"
     sizeItem->setData(Qt::UserRole, sizeInBytes);
     sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -774,17 +763,19 @@ void MainWindow::onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iCon
     m_SearchStats_iNameMatched = iNameMatched;
     m_SearchStats_iContentMatched = iContentMatched;
     m_SearchStats_bSearchInterrupted = bSearchInterrupted;
-
     m_workerHasFinished = true;
-
-    // Falls die Queue schon leer war, als das Signal kam:
-    if (!m_isProcessingPending && m_pendingBatches.isEmpty()) {
+    // Nur wenn gerade KEIN Batch mehr verarbeitet wird,
+    // müssen wir hier den Abschluss triggern.
+    if (!m_isProcessingPending) {
         finalizeUI();
     }
 }
 
 
 void MainWindow::finalizeUI() {
+    if (m_uiFinalizing) return; // Verhindert doppelten Aufruf
+    m_uiFinalizing = true;
+
     qDebug() << "finalizeUI() entry point. m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of search.  m_SearchStats_bSearchInterrupted =" << m_SearchStats_bSearchInterrupted << "  m_bAbortRequested = " << m_bAbortRequested;
 
     if (m_SearchStats_iItemsFound == 0 || m_SearchStats_bSearchInterrupted == true || m_bAbortRequested) {
@@ -844,6 +835,7 @@ void MainWindow::finalizeUI() {
     qDebug() << "m_BenchmarkTimer:" << m_BenchmarkTimer.elapsed() << " ms elapsed since start of search for " << titleString;
     m_timerCalcCrc->start(100);
     m_timerUpdateIcons->start(100);
+    m_uiFinalizing = false;
 }
 
 void MainWindow::onItemChanged(QTableWidgetItem *item) {
@@ -860,13 +852,16 @@ void MainWindow::onItemChanged(QTableWidgetItem *item) {
 
     if (oldPath != newPath) {
         if (QFile::rename(oldPath, newPath)) {
+            QSignalBlocker blocker(item->tableWidget());
             item->setText(cleanedName);
             item->setData(Qt::UserRole, newPath); // Pfad im UserRole Bereich des Items aktualisieren
         } else {
             QMessageBox::critical(this, "Fehler", "Umbenennen fehlgeschlagen.");
+            QSignalBlocker blocker(item->tableWidget());
             item->setText(oldInfo.fileName()); // Text zurücksetzen
         }
     } else if (cleanedName != originalInput) {
+        QSignalBlocker blocker(item->tableWidget());
         item->setText(cleanedName);
     }
 }
@@ -1074,7 +1069,12 @@ void MainWindow::action_ListViewCopyPaths() {
         pathListNative << QDir::toNativeSeparators(path);
     }
 
+#ifdef Q_OS_WIN
     QString sClipboardList = pathListNative.join("\r\n");
+#else
+    QString sClipboardList = pathListNative.join("\n");
+#endif
+
     QGuiApplication::clipboard()->setText(sClipboardList);
 }
 
@@ -1089,9 +1089,6 @@ void MainWindow::action_ListViewDeleteFiles(bool bRecycleOnly) {
     QSet<int> rowSet;
     for (auto *item : std::as_const(selected)) {
         rowSet.insert(item->row());
-    }
-    if (rowSet.size() == 0) {
-        return;
     }
 
     QString sSingleFilePath = "";

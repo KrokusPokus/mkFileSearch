@@ -70,6 +70,13 @@ void SearchWorker::process() {
     QDirIterator iter(m_searchDir, searchFlags, QDirIterator::Subdirectories);
     while (iter.hasNext()) {
         iter.next();
+
+        if (m_abort.load()) {
+            emit searchStats(iItemsFound, iNameMatched, iContentMatched, true);
+            emit finished();
+            return;
+        }
+
         iItemsFound++;
 
         if (!bSearchStringFilenameEmpty) {
@@ -114,11 +121,6 @@ void SearchWorker::process() {
             emit filesFoundBatch(resultsBatch);
             resultsBatch.clear();
         }
-
-        if (m_abort.load()) {
-            bSearchInterrupted = true;
-            break;
-        }
     }
 
     if (!resultsBatch.isEmpty()) {
@@ -132,5 +134,5 @@ void SearchWorker::process() {
 }
 
 void SearchWorker::abort() {
-    m_abort = true;
+    m_abort.store(true);
 }

@@ -161,6 +161,7 @@ private:
     void onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void onWorkerSentBatch(const QList<SearchResult> &results);
     void openFileListWithHandler(const QString &handler, const QStringList &fileList);
+    void processNextBatch();
     void removeCutMarkers();
     void setupClipboardForCut(QSet<int> rowSet);
     void startSearch();
@@ -173,6 +174,7 @@ private:
     uint m_SearchStats_iNameMatched;
     uint m_SearchStats_iContentMatched;
     bool m_SearchStats_bSearchInterrupted;
+    bool m_uiFinalizing = false;
 
     std::atomic<bool> m_bSearchActive{false};
     std::atomic<bool> m_bAbortRequested{false};
