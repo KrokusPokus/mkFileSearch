@@ -14,6 +14,7 @@
 #include <QSet>
 #include <QPainter>             // Added for cut item opacity drawing
 #include <QStyledItemDelegate>  // Added for cut item opacity drawing
+#include <QVBoxLayout>
 
 #include "searchworker.h"
 #include "settingsmanager.h"
@@ -110,7 +111,7 @@ private slots:
 private:
     enum Column {
         eColName = 0,
-        eColSubpath = 1,
+        eColPath = 1,
         eColSize = 2,
         eColDate = 3,
         eColType = 4,
@@ -118,32 +119,6 @@ private:
         eColCount = 6,
         eColCRC = 7,
     };
-
-    QCheckBox *CheckboxRegExContent;
-    QCheckBox *CheckboxRegExName;
-    QCheckBox *CheckboxNameCaseSense;
-    QCheckBox *CheckboxContentCaseSense;
-    QCheckBox *CheckboxDirectories;
-    QCheckBox *CheckboxCRC;
-    QElapsedTimer m_BenchmarkTimer;
-    QFileIconProvider m_iconProvider;
-    QLineEdit *InputBox1;
-    QLineEdit *InputBox2;
-    QString currentDirectory;
-    QTableWidget *tableWidget;
-    QTimer *m_timerCalcCrc;
-    QTimer *m_timerUpdateIcons;
-    QWidget *topControlsContainerWidget;
-
-    QAction *m_actionListViewOpenFiles;
-    QAction *m_actionListViewEditFiles;
-    QAction *m_actionListViewBrowseToFile;
-    QAction *m_actionListViewCopyPaths;
-    QAction *m_actionListViewCutFiles;
-    QAction *m_actionListViewCopyFiles;
-    QAction *m_actionListViewDeleteFiles;
-    QAction *m_actionListViewRenameFiles;
-    QAction *m_actionListViewFileProperties;
 
     QStringList getTablePathList();
     void action_EditSettingsFile();
@@ -156,42 +131,73 @@ private:
     void action_ListViewFileProperties();
     void action_ListViewOpenFiles();
     void action_ListViewRenameFiles();
-    void addFileToTable(const QFileInfo fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
+    void addFileToTable(const QFileInfo &fileInfo, int iRow, int iLenRem, int nameMatchQuality, int contentMatchCount);
     void finalizeUI();
+    void loadMimeCache();
     void onWorkerFinished(uint iItemsFound, uint iNameMatched, uint iContentMatched, bool bSearchInterrupted);
     void onWorkerSentBatch(const QList<SearchResult> &results);
-    void openFileListWithHandler(const QString &handler, const QStringList &fileList);
+    void parseMimeInfoCache(const QString &path);
+    void parseMimeAppsList(const QString &path);
     void processNextBatch();
     void removeCutMarkers();
-    void setupClipboardForCut(QSet<int> rowSet);
+    void setupClipboardForCut(const QSet<int> &rowSet);
     void startSearch();
+    void updateColumns();
     void validateInputBoxRegex();
 
+    QWidget *m_centralWidget = nullptr;
+    QVBoxLayout *m_mainLayout = nullptr;
+    QWidget *m_topControlsContainerWidget = nullptr;
+    QCheckBox *m_CheckboxRegExContent = nullptr;
+    QCheckBox *m_CheckboxRegExName = nullptr;
+    QCheckBox *m_CheckboxNameCaseSense = nullptr;
+    QCheckBox *m_CheckboxContentCaseSense = nullptr;
+    QCheckBox *m_CheckboxDirectories = nullptr;
+    QCheckBox *m_CheckboxCRC = nullptr;
+    QLineEdit *m_LineEdit1 = nullptr;
+    QLineEdit *m_LineEdit2 = nullptr;
+    QTableWidget *m_tableWidget = nullptr;
+    QAction *m_actionListViewOpenFiles = nullptr;
+    QAction *m_actionListViewEditFiles = nullptr;
+    QAction *m_actionListViewBrowseToFile = nullptr;
+    QAction *m_actionListViewCopyPaths = nullptr;
+    QAction *m_actionListViewCutFiles = nullptr;
+    QAction *m_actionListViewCopyFiles = nullptr;
+    QAction *m_actionListViewDeleteFiles = nullptr;
+    QAction *m_actionListViewRenameFiles = nullptr;
+    QAction *m_actionListViewFileProperties = nullptr;
+    QThread *m_workerThread = nullptr;
+    QTimer *m_timerUpdateIcons = nullptr;
+    QTimer *m_timerCalcCrc = nullptr;
 
+    QString m_currentDirectory;
+    QElapsedTimer m_BenchmarkTimer;
+    QFileIconProvider m_iconProvider;
     QPointer<QWidget> m_lastWidget;
-
     uint m_SearchStats_iItemsFound;
     uint m_SearchStats_iNameMatched;
     uint m_SearchStats_iContentMatched;
     bool m_SearchStats_bSearchInterrupted;
-    bool m_uiFinalizing = false;
-
+    bool m_isProcessingPending = false;
     std::atomic<bool> m_bSearchActive{false};
     std::atomic<bool> m_bAbortRequested{false};
     std::atomic<bool> m_workerHasFinished{false};
     std::atomic<int> m_currentSearchGeneration{0};
     QHash<QString, QIcon> m_iconCache;
-
+    QHash<QString, QIcon> m_pathIconCache;
+    QHash<QString, QStringList> m_mimeCache;
     QQueue<QList<SearchResult>> m_pendingBatches;
-    bool m_isProcessingPending = false;
     QByteArray m_currentClipboardToken;
     QSet<int> m_rowsWithCutMarkers;
-
     SettingsManager m_settings;
 
+#ifdef Q_OS_WIN
+    QString getSendToPath();
+#endif
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 };
 #endif // MAINWINDOW_H
 

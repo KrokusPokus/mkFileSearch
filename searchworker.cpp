@@ -1,10 +1,12 @@
-#include "searchworker.h"
-#include "helpers.h"
+
+#include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
 #include <QElapsedTimer>
 #include <QRegularExpression>
-#include <QCoreApplication>
+
+#include "searchworker.h"
+#include "helpers.h"
 
 void SearchWorker::process() {
     QElapsedTimer BenchmarkTimer;
@@ -123,7 +125,7 @@ void SearchWorker::process() {
         }
     }
 
-    if (!resultsBatch.isEmpty()) {
+    if (!resultsBatch.isEmpty() && !m_abort.load()) {
         emit filesFoundBatch(resultsBatch); // Send the remainder
     }
 
