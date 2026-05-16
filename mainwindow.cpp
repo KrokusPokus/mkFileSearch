@@ -22,7 +22,6 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QObject>
-
 #include <QProcess>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -33,7 +32,6 @@
 #include <QStandardPaths>
 #include <QStringList>
 #include <QStringView>
-
 #include <QThread>
 #include <QUrl>
 #include <utility> // Für std::as_const
@@ -1322,32 +1320,7 @@ void MainWindow::action_ListViewBrowseToFile() {
     if (!item) return;
 
     QString path = m_tableWidget->item(item->row(), eColName)->data(Qt::UserRole).toString();
-#ifdef Q_OS_WIN
-    QStringList args;
-    if (!m_settings.fileManager.isEmpty()) {
-        QFileInfo fileInfo(path);
-        QString sDir = fileInfo.dir().path();
-        qDebug() << m_settings.fileManager;
-        args << "-p" << QDir::toNativeSeparators(sDir) << "-f" << fileInfo.fileName();
-        QProcess::startDetached(QDir::toNativeSeparators(m_settings.fileManager), args);
-    } else {
-        QStringList args;
-        args << "/select," + QDir::toNativeSeparators(path);
-        QProcess::startDetached("explorer.exe", args);
-    }
-#elif defined(Q_OS_LINUX) || defined(Q_OS_UNIX)
-    QProcess::startDetached("dbus-send", {
-                                             "--session",
-                                             "--print-reply",
-                                             "--dest=org.freedesktop.FileManager1",
-                                             "/org/freedesktop/FileManager1",
-                                             "org.freedesktop.FileManager1.ShowItems",
-                                             "array:string:" + QUrl::fromLocalFile(path).toString(),
-                                             "string:\"\""
-                                         });
-#else
-    QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
-#endif
+    browseToFile(path);
 }
 
 void MainWindow::action_ListViewRenameFiles() {
@@ -1528,14 +1501,11 @@ void MainWindow::loadMimeCache() {
     m_mimeCache.clear();
     m_mimeCache.reserve(500);
 
-    QStringList cachePaths = {
-        "/usr/share/applications/mimeinfo.cache",
-        "/usr/local/share/applications/mimeinfo.cache",
-        QDir::homePath() + "/.local/share/applications/mimeinfo.cache"
-    };
-
-    for (const QString &path : cachePaths) {
-        parseMimeInfoCache(path);
+    QStringList appDirs = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);  // Order: User before System
+    std::reverse(appDirs.begin(), appDirs.end());   // Reverse to System before User, so we can overwrite System with User keys while parsing
+    for (const QString &dirPath : std::as_const(appDirs)) {
+        QString cachePath = QDir(dirPath).filePath("mimeinfo.cache");
+        parseMimeInfoCache(cachePath);
     }
 
     parseMimeAppsList(QDir::homePath() + "/.config/mimeapps.list");

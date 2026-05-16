@@ -1,6 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "searchworker.h"
+#include "settingsmanager.h"
+
 #include <QMainWindow>
 #include <QTableWidget>
 #include <QLineEdit>
@@ -15,9 +18,6 @@
 #include <QPainter>             // Added for cut item opacity drawing
 #include <QStyledItemDelegate>  // Added for cut item opacity drawing
 #include <QVBoxLayout>
-
-#include "searchworker.h"
-#include "settingsmanager.h"
 
 /*
  * [QTableWidget Qt::UserRole usage]

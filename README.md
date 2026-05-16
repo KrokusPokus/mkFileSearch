@@ -26,4 +26,20 @@ if [ -d "$CLEAN_PATH" ]; then
 fi
 ```
 
-Note that this needs Dolphin to be set up to show the full path in its title bar.
+Note that this relies on Dolphin to be set to show the full path in its title bar.
+(You can get as fancy with this as you like. If you reconstruct the path from Kate or Konsole title bars you can start search from those windows as well.)
+
+
+# FAQ
+
+### Why did you write this? Is the Dolphin-internal search so bad?
+
+I prefer to have a separate search window I can spawn as needed. Since my file manager windows tend to be sized very narrow und and set to compact mode, they are not fit to display search results.
+
+### So why didn't you use just use KFind?
+
+The way one needs to enter search terms in KFind annoyed the crap out of me. I want to type some word fragments and have it go. KFind doesn't hold with that.
+
+### This is slow. Why not use Baloo indexing?
+
+I don't like indexing.

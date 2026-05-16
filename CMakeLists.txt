@@ -30,6 +30,29 @@ qt_standard_project_setup()
 # Diese Zeile ist entscheidend, damit Qt die Ressourcen kompiliert!
 set(CMAKE_AUTORCC ON)
 
+# --- PERFORMANCE FLAGS START ---
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT result)
+if(result)
+    # Aktiviert LTO/IPO für alle Targets
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
+if(MSVC)
+    add_compile_options(/O2 /Ot /GL /arch:AVX2)
+else()
+    # -O3: Aggressive Optimierung
+    # -march=native: Nutzt SSE/AVX der aktuellen CPU
+    # -flto: Link Time Optimization
+    # -fomit-frame-pointer: Befreit ein Register für Daten (statt Stack-Tracking)
+    add_compile_options(-O3 -march=native -flto -fomit-frame-pointer)
+endif()
+# --- PERFORMANCE FLAGS END ---
+
 qt_add_executable(mkFileSearch
     WIN32 MACOSX_BUNDLE
     main.cpp

@@ -1,3 +1,6 @@
+#include "mainwindow.h"
+#include "settingsmanager.h"
+
 #include <iostream>
 #include <QApplication>
 #include <QCommandLineOption>
@@ -6,9 +9,6 @@
 #include <QFont>
 #include <QString>
 #include <QTranslator>
-
-#include "mainwindow.h"
-#include "settingsmanager.h"
 
 int main(int argc, char *argv[])
 {

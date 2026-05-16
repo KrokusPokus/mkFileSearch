@@ -2,8 +2,6 @@
 #define SETTINGSMANAGER_H
 
 #include <QString>
-
-#include <QString>
 #include <QSet>
 #include <QSettings>
 #include <QDir>
