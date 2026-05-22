@@ -64,13 +64,17 @@ public:
 
 
 class CutDelegate : public QStyledItemDelegate {
+private:
+    const QSet<QString> &m_cutFilePaths;
+
 public:
-    using QStyledItemDelegate::QStyledItemDelegate;
+    CutDelegate(const QSet<QString> &cutFilePaths, QObject *parent = nullptr)
+        : QStyledItemDelegate(parent), m_cutFilePaths(cutFilePaths) {}
 
     void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override {
-        // Wir nutzen eine benutzerdefinierte Daten-Rolle (z.B. Qt::UserRole + 5),
-        // um zu prüfen, ob dieses Item "ausgeschnitten" ist.
-        bool isCut = index.data(Qt::UserRole + 5).toBool();
+        QString path = index.siblingAtColumn(0).data(Qt::UserRole).toString();
+
+        bool isCut = m_cutFilePaths.contains(path);
 
         if (isCut) {
             painter->save();
@@ -120,7 +124,10 @@ private:
         eColCRC = 7,
     };
 
-    QStringList getTablePathList();
+    QString getActiveViewCurrentItemPath();
+    QStringList getActiveViewPathList();
+    QSet<int> getActiveViewRowSet();
+
     void action_EditSettingsFile();
     void action_ListViewBrowseToFile();
     void action_ListViewCopyFiles();
@@ -140,7 +147,8 @@ private:
     void parseMimeAppsList(const QString &path);
     void processNextBatch();
     void removeCutMarkers();
-    void setupClipboardForCut(const QSet<int> &rowSet);
+    void setupClipboardForCut(const QSet<QString> &cutFilePaths);
+    bool showDeleteConfirmationDialog(const QStringList &pathList, bool bRecycleOnly);
     void startSearch();
     void updateColumns();
     void validateInputBoxRegex();
@@ -188,7 +196,7 @@ private:
     QHash<QString, QStringList> m_mimeCache;
     QQueue<QList<SearchResult>> m_pendingBatches;
     QByteArray m_currentClipboardToken;
-    QSet<int> m_rowsWithCutMarkers;
+    QSet<QString> m_cutFilePaths;
     SettingsManager m_settings;
 
 #ifdef Q_OS_WIN

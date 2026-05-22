@@ -74,6 +74,11 @@ target_link_libraries(mkFileSearch
         $<$<PLATFORM_ID:Linux>:ZLIB::ZLIB>
 )
 
+# Beschleunigt den Start unter Linux, indem ungenutzte Shared Libraries ignoriert werden
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(mkFileSearch PRIVATE -Wl,--as-needed)
+endif()
+
 install(TARGETS mkFileSearch
     BUNDLE  DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

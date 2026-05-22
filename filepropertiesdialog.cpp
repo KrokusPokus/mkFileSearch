@@ -423,7 +423,7 @@ QString FilePropertiesDialog::getFileType(const QFileInfo &info) {
 #if defined(Q_OS_LINUX)
     if (info.isSymLink()) return tr("SymLink");
 #endif
-    return info.suffix().toUpper() + tr("-File");
+    return info.suffix().isEmpty() ? tr("File") : info.suffix().toUpper() + tr("-File");
 }
 
 void FilePropertiesDialog::onOkPressed() {
