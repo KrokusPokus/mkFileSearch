@@ -1,18 +1,18 @@
 #ifndef SETTINGSMANAGER_H
 #define SETTINGSMANAGER_H
 
-#include <QString>
+#include <QDir>
 #include <QSet>
 #include <QSettings>
-#include <QDir>
 #include <QStandardPaths>
+#include <QString>
 
 class SettingsManager {
 public:
 	SettingsManager();
 
 	void load();
-    void save();
+    void saveSettings();
     QString getSettingsPath();
 
 	QSet<QString> audioExts;
@@ -25,6 +25,8 @@ public:
 	QString textEditor;
 	QString videoEditor;
 	QString fileManager;
+    QString searchTool;
+    QString renameTool;
 
 	bool alternatingRowColors;
 	bool showGrid;
@@ -35,7 +37,6 @@ public:
     QString fontNameOverride;
 
 private:
-
 	QSet<QString> parseExtensions(const QString &input);
     void safeSetValue(QSettings &settings, const QString &key, const QVariant &value);
     QString formatStringSet(const QSet<QString> &extensionSet);
