@@ -166,7 +166,7 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     m_tableWidget->horizontalHeader()->setHighlightSections(false);
 
     m_tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_tableWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    m_tableWidget->setContextMenuPolicy(Qt::NoContextMenu);
 
     m_tableWidget->setAlternatingRowColors(m_settings.alternatingRowColors);
     m_tableWidget->setShowGrid(m_settings.showGrid);
@@ -405,7 +405,6 @@ MainWindow::MainWindow(const QString &targetDirectory, QWidget *parent)
     connect(m_CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::validateInputBoxRegex);
     connect(m_CheckboxRegExContent, &QCheckBox::checkStateChanged, this, &MainWindow::validateInputBoxRegex);
     connect(m_tableWidget, &Custom_QTableWidget::itemChanged, this, &MainWindow::onItemChanged);
-    connect(m_tableWidget, &Custom_QTableWidget::customContextMenuRequested, this, &MainWindow::onShowContextMenu);
     connect(m_tableWidget, &Custom_QTableWidget::itemDoubleClicked, this, &MainWindow::onListViewItemDoubleClicked);
     connect(m_CheckboxCRC, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxClickedCRC);
     connect(m_CheckboxRegExName, &QCheckBox::checkStateChanged, this, &MainWindow::onCheckboxClickedRegExName);
@@ -1326,8 +1325,16 @@ void MainWindow::addFileToTable(const QFileInfo &fileInfo, int iRow, int iLenRem
         }
     }
 
+#ifdef Q_OS_WIN
+    QString ext = fileInfo.suffix().toLower();
+    bool bUseRedText = ((ext == "exe" || ext == "scr") && !fileInfo.isDir() && m_settings.executableFilesRed);
+#elif defined(Q_OS_LINUX)
+    bool bUseRedText = (fileInfo.isExecutable() && !fileInfo.isDir() && m_settings.executableFilesRed);
+#endif
+
     nameItem->setIcon(it.value());
     nameItem->setData(Qt::UserRole, QVariant::fromValue(fileInfo));
+    nameItem->setData(Qt::UserRole + 2, bUseRedText);
     nameItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
     m_tableWidget->setItem(iRow, eColName, nameItem);
 
@@ -1548,24 +1555,52 @@ bool MainWindow::showDeleteConfirmationDialog(const QStringList &pathList, bool 
 //######################################################################################
 // Protected Overrides
 
-void MainWindow::resizeEvent(QResizeEvent *event) {
-    QMainWindow::resizeEvent(event);
-    updateColumns();
-}
-
+// installiert auf "qApp"
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     if (obj == m_tableWidget->viewport() && event->type() == QEvent::Resize) {
         m_timerCalcCrc->start(100);
         m_timerUpdateIcons->start(100);
+        updateColumns();
+
+        /*
+        if (m_tableWidget) {
+            QTableWidgetItem *currentItem = m_tableWidget->currentItem();
+            if (currentItem) {
+                m_tableWidget->scrollToItem(currentItem, QAbstractItemView::EnsureVisible);
+            }
+        }
+        */
     }
 
-    if (event->type() == QEvent::KeyPress) {
+    if (event->type() == QEvent::MouseButtonPress) {
+        if (obj == m_tableWidget->viewport()) {
+            auto *mouseEvent = static_cast<QMouseEvent*>(event);
+            if (mouseEvent->button() == Qt::RightButton && !m_settings.menuOnMouseUp) {
+                QPoint pos = mouseEvent->pos();
+                // Use Lambda to trigger menu after button event has finished processing
+                // This is a workaround. Calling onShowContextMenu() directly would block the default funtion of focusing the item below the mouse cursor.
+                QTimer::singleShot(0, this, [this, pos]() {
+                    onShowContextMenu(pos);
+                });
+
+                return false;
+            }
+        }
+    }
+    else if (event->type() == QEvent::MouseButtonRelease) {
+        if (obj == m_tableWidget->viewport()) {
+            auto *mouseEvent = static_cast<QMouseEvent*>(event);
+            if (mouseEvent->button() == Qt::RightButton && m_settings.menuOnMouseUp) {
+                onShowContextMenu(mouseEvent->pos());
+                return true;
+            }
+        }
+    }
+    else if (event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
 
-        //if (keyEvent->key()) qDebug() << "eventFilter: key pressed:" << keyEvent->key();
-
         if (keyEvent->key() == Qt::Key_Escape) {
-            //qDebug() << "eventFilter: Qt::Key_Escape pressed!   m_bSearchActive=" << m_bSearchActive.load();
+
             if (m_bSearchActive.load()) {
                 m_bAbortRequested.store(true);
                 emit abortSearchWorkerRequested();
