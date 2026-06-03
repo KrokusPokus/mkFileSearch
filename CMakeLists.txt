@@ -3,11 +3,6 @@ project(mkFileSearch LANGUAGES CXX)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Concurrent LinguistTools)
 
-qt_add_translations(mkFileSearch
-    TS_FILES i18n/mkFileSearch_de.ts
-    SOURCES ${PROJECT_SOURCES}
-)
-
 if(UNIX)
     find_package(ZLIB REQUIRED)
 else()
@@ -55,14 +50,19 @@ endif()
 
 qt_add_executable(mkFileSearch
     WIN32 MACOSX_BUNDLE
-    main.cpp
-    mainwindow.h mainwindow.cpp
-    resources.qrc
-    searchworker.h searchworker.cpp
-    helpers.h helpers.cpp
-    settingsmanager.h settingsmanager.cpp
-    filepropertiesdialog.h filepropertiesdialog.cpp
+    src/main.cpp
+    src/mainwindow.h src/mainwindow.cpp
+    src/searchworker.h src/searchworker.cpp
+    src/helpers.h src/helpers.cpp
+    src/settingsmanager.h src/settingsmanager.cpp
+    src/filepropertiesdialog.h src/filepropertiesdialog.cpp
+    res/resources.qrc
+)
 
+target_include_directories(mkFileSearch PRIVATE src)
+
+qt_add_translations(mkFileSearch
+    TS_FILES i18n/mkFileSearch_de.ts
 )
 
 target_link_libraries(mkFileSearch
